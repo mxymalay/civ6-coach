@@ -1,0 +1,14 @@
+.build/
+.swiftpm/
+dist/
+*.app/
+*.zip
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.env*
+auth.json
+conversation*.json
+coach-data/
+work/

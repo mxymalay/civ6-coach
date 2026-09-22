@@ -1,0 +1,6 @@
+[project]
+name = "civ6-coach"
+version = "0.1.0"
+description = "Read-only Civilization VI Chinese teaching bridge"
+requires-python = ">=3.12"
+dependencies = ["mcp>=1.20,<2"]
