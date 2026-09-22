@@ -106,6 +106,7 @@ function collect_snapshot()
     local boosts={}
     for b in GameInfo.Boosts() do if b.TechnologyType then boosts[b.TechnologyType]=b end end
     for t in GameInfo.Technologies() do
+      if te:HasTech(t.Index) then emit('technology_completed',{name=name(t),type=t.TechnologyType}) end
       if te:CanResearch(t.Index) and not te:HasTech(t.Index) then
         local r={name=name(t),type=t.TechnologyType,current=te:GetResearchingTech()==t.Index,
           turns=te:GetTurnsToResearch(t.Index),boosted=te:HasBoostBeenTriggered(t.Index)}
@@ -114,6 +115,7 @@ function collect_snapshot()
         emit('technology_option',r)
       end
     end
+    emit('technology_coverage',{complete=true})
   end)
   section('civic',function()
     local cu=p:GetCulture(); local idx=cu:GetProgressingCivic()
@@ -137,13 +139,16 @@ function collect_snapshot()
     end
   end)
 end
-function collect_map(cx,cy,radius)
+function collect_map(cx,cy,radius,seen,budget)
   local me,p=context(); local vis=PlayersVisibility[me]
   local w,h=Map.GetGridSize()
   if cx>=w or cy>=h then error('坐标超出地图') end
   for dy=-radius,radius do for dx=-radius,radius do
     local plot=Map.GetPlot(cx+dx,cy+dy)
-    if plot and Map.GetPlotDistance(cx,cy,plot:GetX(),plot:GetY())<=radius and vis:IsVisible(plot:GetIndex()) then
+    if plot and Map.GetPlotDistance(cx,cy,plot:GetX(),plot:GetY())<=radius and vis:IsVisible(plot:GetIndex()) and (not seen or not seen[plot:GetIndex()]) then
+      if budget and budget.count>=4000 then budget.truncated=true; return end
+      if seen then seen[plot:GetIndex()]=true end
+      if budget then budget.count=budget.count+1 end
       local r={x=plot:GetX(),y=plot:GetY(),owner=plot:GetOwner(),terrain=name(GameInfo.Terrains[plot:GetTerrainType()]),
         feature=name(GameInfo.Features[plot:GetFeatureType()]),hills=plot:IsHills(),river=plot:IsRiver(),water=plot:IsWater()}
       field(r,'resource',function()
@@ -164,4 +169,11 @@ function collect_map(cx,cy,radius)
       end)
     end
   end end
+end
+function collect_empire_map()
+  local me,p=context()
+  local seen={}; local budget={count=0,truncated=false}
+  for _,c in p:GetCities():Members() do collect_map(c:GetX(),c:GetY(),3,seen,budget) end
+  for _,u in p:GetUnits():Members() do collect_map(u:GetX(),u:GetY(),3,seen,budget) end
+  emit('map_coverage',{scope='all_own_cities_and_units_radius_3_currently_visible',tiles=budget.count,truncated=budget.truncated,limit=4000})
 end

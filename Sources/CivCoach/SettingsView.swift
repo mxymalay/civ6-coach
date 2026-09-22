@@ -100,7 +100,8 @@ struct SettingsView: View {
             Text("陪练与隐私").font(.system(size: 15, weight: .semibold))
             field("学习目标") { TextField("例如：基础运营 / 科技胜利", text: $draft.goal) }
             HStack { Text("局势刷新"); Spacer(); Picker("局势刷新", selection: $draft.pollSeconds) { Text("每 5 秒").tag(5); Text("每 8 秒").tag(8); Text("每 15 秒").tag(15); Text("每 30 秒").tag(30) }.labelsHidden().frame(width: 140) }
-            Toggle("向 AI 提供首都附近的可见地图", isOn: $draft.includeMap)
+            Toggle("读取所有城市和单位附近的可见地图", isOn: $draft.includeMap)
+            Text("周围 3 格、只含当前视野，去重后最多 4000 地块；发送 AI 时最多 240 个地块细节和 400 条单位记录，并标注抽样。不读取迷雾。").font(.system(size: 11)).foregroundStyle(palette.secondary)
             Toggle("在本机保存对话记录", isOn: $draft.rememberChat)
             Text("关闭保存会移除当前对话的本地副本，历史归档仍保留。游戏读取仅在本机进行，刷新不会自动调用 AI。只有点建议或发送聊天时，才将相关数据发送到 API。").font(.system(size: 11)).foregroundStyle(palette.secondary).lineSpacing(5)
         }.font(.system(size: 12)).toggleStyle(.switch).controlSize(.small)

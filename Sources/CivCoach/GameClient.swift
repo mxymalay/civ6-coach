@@ -18,7 +18,7 @@ actor GameClient {
         var lua = try String(contentsOf: scriptURL, encoding: .utf8)
         lua += "\ncollect_snapshot()"
         if includeMap {
-            lua += "\nlocal p=Players[Game.GetLocalPlayer()]; for _,c in p:GetCities():Members() do collect_map(c:GetX(),c:GetY(),3); break end"
+            lua += "\ncollect_empire_map()"
         }
         let flag = CancellationFlag()
         let code = lua

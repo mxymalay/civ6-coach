@@ -158,6 +158,21 @@ struct MainView: View {
                     }.padding(16).background(palette.gold.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
                 }
                 if let snap = state.snapshot {
+                    if let from = state.turnChanges.fromTurn, let to = state.turnChanges.toTurn {
+                        Card {
+                          VStack(alignment: .leading, spacing: 8) {
+                            Text("回合变化 · \(from) → \(to)").font(.system(size: 14, weight: .semibold))
+                            Text("本地比较 · 不调用 AI" + (to - from > 1 ? " · 跨回合汇总" : "")).font(.system(size: 10)).foregroundStyle(palette.secondary)
+                            if state.turnChanges.tips.isEmpty { Text("已采集字段中没有新的重点变化；不代表没有其他事件。").font(.system(size: 11)).foregroundStyle(palette.secondary) }
+                            ForEach(state.turnChanges.tips) { tip in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Label(tip.title, systemImage: tip.icon).font(.system(size: 12, weight: .medium)).foregroundStyle(tip.urgent ? palette.gold : palette.primary)
+                                    Text(tip.detail).font(.system(size: 11)).foregroundStyle(palette.secondary)
+                                }.padding(.top, 8)
+                            }
+                          }
+                        }
+                    }
                     HStack(spacing: 12) {
                         stat("国库", value: snap.economy.display("gold"), detail: "净收入 " + snap.economy.display("gold_net_per_turn") + "/回合", icon: "circle.circle", color: palette.gold)
                         stat("科技", value: snap.economy.display("science_per_turn"), detail: "每回合科研产出", icon: "flask", color: .cyan.opacity(0.8))

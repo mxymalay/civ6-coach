@@ -59,6 +59,13 @@ struct MenuContent: View {
             if let message = state.error ?? state.connectionError { Text(message).font(.system(size: 11)).foregroundStyle(palette.gold).lineLimit(4) }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if let from = state.turnChanges.fromTurn, let to = state.turnChanges.toTurn, !state.turnChanges.tips.isEmpty {
+                        Text("回合变化 · \(from) → \(to)").font(.system(size: 11, weight: .semibold))
+                        ForEach(state.turnChanges.tips.prefix(3)) { tip in
+                            Text(tip.title).font(.system(size: 11)).foregroundStyle(tip.urgent ? palette.gold : palette.secondary)
+                        }
+                        Divider()
+                    }
                     if !state.advice.isEmpty {
                         Text("AI 建议 · 第 \(state.adviceTurn ?? 0) 回合" + (state.adviceComplete ? "" : " · 未完成")).font(.system(size: 10)).foregroundStyle(palette.secondary)
                         MarkdownText(text: state.advice)

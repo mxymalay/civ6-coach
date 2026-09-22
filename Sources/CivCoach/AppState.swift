@@ -7,6 +7,7 @@ import AppKit
     @Published var settings: Settings
     @Published var enabled = false
     @Published var snapshot: Snapshot?
+    @Published var turnChanges = TurnChanges()
     @Published var refreshing = false
     @Published var connectionError: String?
     @Published var error: String?
@@ -83,6 +84,7 @@ import AppKit
                 advice = ""; adviceTurn = nil; adviceComplete = false
                 error = "检测到回合倒退或文明变化，已为新局开启对话。"
             }
+            turnChanges.update(value)
             lastIdentity = value.identity; snapshot = value; connectionError = nil
             return value
         } catch is CancellationError { return nil }
