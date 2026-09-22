@@ -4,8 +4,8 @@ import SwiftUI
 struct PanelPresentation {
     let transparent: Bool
     var hasShadow: Bool { !transparent }
-    var minimumWidth: Double { transparent ? 300 : 360 }
-    var minimumHeight: Double { transparent ? 200 : 420 }
+    var minimumWidth: Double { transparent ? 240 : 320 }
+    var minimumHeight: Double { transparent ? 120 : 280 }
     static func keepingOnScreen(_ frame: NSRect, visible: NSRect) -> NSRect {
         var result = frame
         result.origin.x = max(visible.minX, min(result.minX, visible.maxX - result.width))
@@ -16,21 +16,48 @@ struct PanelPresentation {
 
 struct PanelPreferences: Codable {
     var pinned = false
-    private(set) var width = 380.0
-    private(set) var height = 520.0
-    var dismissesOnOutsideClick: Bool { !pinned }
-    var presentation: PanelPresentation { PanelPresentation(transparent: pinned) }
+    var transparent = false
+    private var normalWidth = 380.0
+    private var normalHeight = 400.0
+    private var overlayWidth = 320.0
+    private var overlayHeight = 220.0
+    var width: Double { transparent ? overlayWidth : normalWidth }
+    var height: Double { transparent ? overlayHeight : normalHeight }
+    var dismissesOnOutsideClick: Bool { !pinned && !transparent }
+    var presentation: PanelPresentation { PanelPresentation(transparent: transparent) }
     init() {}
-    enum CodingKeys: String, CodingKey { case pinned, width, height }
+    enum CodingKeys: String, CodingKey { case pinned, transparent, normalWidth, normalHeight, overlayWidth, overlayHeight, width, height }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
-        resize(width: try c.decodeIfPresent(Double.self, forKey: .width) ?? 380,
-               height: try c.decodeIfPresent(Double.self, forKey: .height) ?? 520)
+        let mode = try c.decodeIfPresent(Bool.self, forKey: .transparent)
+        transparent = true
+        resize(width: try c.decodeIfPresent(Double.self, forKey: .overlayWidth) ?? 320,
+               height: try c.decodeIfPresent(Double.self, forKey: .overlayHeight) ?? 220)
+        transparent = false
+        resize(width: try c.decodeIfPresent(Double.self, forKey: .normalWidth) ?? 380,
+               height: try c.decodeIfPresent(Double.self, forKey: .normalHeight) ?? 400)
+        transparent = mode ?? pinned
+        if mode == nil {
+            pinned = false
+            resize(width: try c.decodeIfPresent(Double.self, forKey: .width) ?? width,
+                   height: try c.decodeIfPresent(Double.self, forKey: .height) ?? height)
+        }
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(pinned, forKey: .pinned)
+        try c.encode(transparent, forKey: .transparent)
+        try c.encode(normalWidth, forKey: .normalWidth)
+        try c.encode(normalHeight, forKey: .normalHeight)
+        try c.encode(overlayWidth, forKey: .overlayWidth)
+        try c.encode(overlayHeight, forKey: .overlayHeight)
     }
     mutating func resize(width: Double, height: Double) {
-        self.width = width.isFinite ? min(1000, max(presentation.minimumWidth, width)) : 380
-        self.height = height.isFinite ? min(1000, max(presentation.minimumHeight, height)) : 520
+        let w = width.isFinite ? min(1000, max(presentation.minimumWidth, width)) : 380
+        let h = height.isFinite ? min(1000, max(presentation.minimumHeight, height)) : 400
+        if transparent { overlayWidth = w; overlayHeight = h }
+        else { normalWidth = w; normalHeight = h }
     }
 }
 
@@ -106,7 +133,10 @@ private final class CoachPanel: NSPanel {
     }
     func togglePin() {
         preferences.pinned.toggle()
-        preferences.resize(width: preferences.width, height: preferences.height)
+        savePreferences()
+    }
+    func toggleOverlay() {
+        preferences.transparent.toggle()
         applyPresentation()
         savePreferences()
     }
@@ -117,9 +147,8 @@ private final class CoachPanel: NSPanel {
         let appearance = preferences.presentation
         let topLeft = NSPoint(x: panel.frame.minX, y: panel.frame.maxY)
         let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
-        panel.styleMask = appearance.transparent
-            ? [.borderless, .resizable, .nonactivatingPanel]
-            : [.titled, .resizable, .closable, .nonactivatingPanel, .fullSizeContentView]
+        // Both layouts own their compact headers; reserve no native title-bar space.
+        panel.styleMask = [.borderless, .resizable, .nonactivatingPanel]
         panel.titleVisibility = .hidden; panel.titlebarAppearsTransparent = true
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] { panel.standardWindowButton(button)?.isHidden = true }
         panel.isOpaque = !appearance.transparent
@@ -157,9 +186,10 @@ private struct QuickPanelRoot: View {
     @EnvironmentObject var quickPanel: QuickPanelController
     var body: some View {
         Group {
-            if quickPanel.preferences.pinned { GameOverlayView() }
+            if quickPanel.preferences.transparent { GameOverlayView() }
             else { MenuContent() }
         }.environment(\.coachTheme, state.settings.theme)
-         .preferredColorScheme(quickPanel.preferences.pinned ? .dark : state.settings.theme.colorScheme)
+         .preferredColorScheme(quickPanel.preferences.transparent ? .dark : state.settings.theme.colorScheme)
+         .overlay { PanelResizeBorder() }
     }
 }
