@@ -1,11 +1,25 @@
 import AppKit
 import SwiftUI
 
+struct PanelPresentation {
+    let transparent: Bool
+    var hasShadow: Bool { !transparent }
+    var minimumWidth: Double { transparent ? 300 : 360 }
+    var minimumHeight: Double { transparent ? 200 : 420 }
+    static func keepingOnScreen(_ frame: NSRect, visible: NSRect) -> NSRect {
+        var result = frame
+        result.origin.x = max(visible.minX, min(result.minX, visible.maxX - result.width))
+        result.origin.y = max(visible.minY, min(result.minY, visible.maxY - result.height))
+        return result
+    }
+}
+
 struct PanelPreferences: Codable {
     var pinned = false
     private(set) var width = 380.0
     private(set) var height = 520.0
     var dismissesOnOutsideClick: Bool { !pinned }
+    var presentation: PanelPresentation { PanelPresentation(transparent: pinned) }
     init() {}
     enum CodingKeys: String, CodingKey { case pinned, width, height }
     init(from decoder: Decoder) throws {
@@ -15,8 +29,8 @@ struct PanelPreferences: Codable {
                height: try c.decodeIfPresent(Double.self, forKey: .height) ?? 520)
     }
     mutating func resize(width: Double, height: Double) {
-        self.width = width.isFinite ? min(1000, max(360, width)) : 380
-        self.height = height.isFinite ? min(1000, max(420, height)) : 520
+        self.width = width.isFinite ? min(1000, max(presentation.minimumWidth, width)) : 380
+        self.height = height.isFinite ? min(1000, max(presentation.minimumHeight, height)) : 520
     }
 }
 
@@ -33,6 +47,7 @@ private final class CoachPanel: NSPanel {
     private var localMonitor: Any?
     private var openMain: (() -> Void)?
     private weak var state: AppState?
+    private var changingPresentation = false
 
     override init() {
         preferences = AppState.preferences.data(forKey: "coach.panel.v1")
@@ -62,11 +77,11 @@ private final class CoachPanel: NSPanel {
         window.hidesOnDeactivate = false; window.isReleasedWhenClosed = false
         window.isFloatingPanel = true; window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.contentMinSize = NSSize(width: 360, height: 420)
         window.contentMaxSize = NSSize(width: 1000, height: 1000)
         window.contentView = NSHostingView(rootView: QuickPanelRoot().environmentObject(state).environmentObject(self))
         window.delegate = self
         panel = window
+        applyPresentation()
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.dismissOutside() }
         }
@@ -91,8 +106,30 @@ private final class CoachPanel: NSPanel {
     }
     func togglePin() {
         preferences.pinned.toggle()
-        panel?.level = .floating
+        preferences.resize(width: preferences.width, height: preferences.height)
+        applyPresentation()
         savePreferences()
+    }
+    private func applyPresentation() {
+        guard let panel else { return }
+        changingPresentation = true
+        defer { changingPresentation = false }
+        let appearance = preferences.presentation
+        let topLeft = NSPoint(x: panel.frame.minX, y: panel.frame.maxY)
+        let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+        panel.styleMask = appearance.transparent
+            ? [.borderless, .resizable, .nonactivatingPanel]
+            : [.titled, .resizable, .closable, .nonactivatingPanel, .fullSizeContentView]
+        panel.titleVisibility = .hidden; panel.titlebarAppearsTransparent = true
+        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] { panel.standardWindowButton(button)?.isHidden = true }
+        panel.isOpaque = !appearance.transparent
+        panel.backgroundColor = appearance.transparent ? .clear : .windowBackgroundColor
+        panel.hasShadow = appearance.hasShadow
+        panel.level = .floating
+        panel.contentMinSize = NSSize(width: appearance.minimumWidth, height: appearance.minimumHeight)
+        let proposed = NSRect(x: topLeft.x, y: topLeft.y - preferences.height, width: preferences.width, height: preferences.height)
+        panel.setFrame(visible.map { PanelPresentation.keepingOnScreen(proposed, visible: $0) } ?? proposed, display: true)
+        panel.invalidateShadow()
     }
     func closePanel() { panel?.orderOut(nil) }
     func showMain(settings: Bool = false, chat: Bool = false) {
@@ -106,7 +143,7 @@ private final class CoachPanel: NSPanel {
     }
     func windowDidResignKey(_ notification: Notification) { dismissOutside() }
     func windowDidResize(_ notification: Notification) {
-        guard let panel else { return }
+        guard let panel, !changingPresentation else { return }
         preferences.resize(width: panel.frame.width, height: panel.frame.height)
         savePreferences()
     }
@@ -117,8 +154,12 @@ private final class CoachPanel: NSPanel {
 
 private struct QuickPanelRoot: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var quickPanel: QuickPanelController
     var body: some View {
-        MenuContent().environment(\.coachTheme, state.settings.theme)
-            .preferredColorScheme(state.settings.theme.colorScheme)
+        Group {
+            if quickPanel.preferences.pinned { GameOverlayView() }
+            else { MenuContent() }
+        }.environment(\.coachTheme, state.settings.theme)
+         .preferredColorScheme(quickPanel.preferences.pinned ? .dark : state.settings.theme.colorScheme)
     }
 }

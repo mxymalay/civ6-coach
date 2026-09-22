@@ -92,7 +92,7 @@ struct SettingsView: View {
             }
             Text("当前设置页即时预览；保存后同步主窗口与快捷小窗。").font(.system(size: 11)).foregroundStyle(palette.secondary)
             Toggle("主窗口保持在最前面", isOn: $draft.alwaysOnTop).toggleStyle(.switch).controlSize(.small)
-            Text("快捷小窗独立使用右上角图钉控制置顶，可拖动边缘调整大小。").font(.system(size: 11)).foregroundStyle(palette.secondary)
+            Text("快捷小窗固定后变成透明游戏叠加层，只保留文字与空心按钮；移入顶部显示控制，拖动顶部移动，拖动边缘缩放。取消固定恢复完整小窗。").font(.system(size: 11)).foregroundStyle(palette.secondary)
         }.font(.system(size: 12))
     }
     private var coachingPage: some View {

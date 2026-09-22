@@ -13,6 +13,7 @@ import AppKit
             CommandGroup(replacing: .appSettings) { Button("AI 与偏好设置…") { quickPanel.showMain(settings: true) }.keyboardShortcut(",", modifiers: .command) }
             CommandMenu("陪练") {
                 Button("显示或收起快捷小窗") { quickPanel.togglePanel() }.keyboardShortcut("j", modifiers: [.command, .shift])
+                Button(quickPanel.preferences.pinned ? "取消固定小窗" : "固定小窗（透明叠加层）") { quickPanel.togglePin() }.keyboardShortcut("o", modifiers: [.command, .shift])
                 Button(state.enabled ? "暂停陪练" : "开启陪练") { state.setEnabled(!state.enabled) }.keyboardShortcut("p", modifiers: [.command, .shift])
                 Button("一键 AI 建议") { state.askAdvice() }.disabled(!state.enabled || state.generating).keyboardShortcut("j", modifiers: .command)
                 Button("停止回答") { state.stopGeneration() }.disabled(!state.generating)
@@ -91,6 +92,9 @@ struct MenuContent: View {
                 Button("聊一聊") { quickPanel.showMain(chat: true) }.buttonStyle(QuietButton())
                 Button("设置") { quickPanel.showMain(settings: true) }.buttonStyle(QuietButton())
                 Spacer()
+                PanelResizeHandle().frame(width: 30, height: 30)
+                    .overlay(Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 12)).foregroundStyle(palette.secondary).allowsHitTesting(false))
+                    .help("拖动这里调整小窗大小")
                 Button("退出") { state.setEnabled(false); NSApp.terminate(nil) }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(palette.secondary)
             }
         }.padding(18).frame(minWidth: 360, maxWidth: .infinity, minHeight: 420, maxHeight: .infinity).background(palette.background).foregroundStyle(palette.primary).preferredColorScheme(theme.colorScheme)
