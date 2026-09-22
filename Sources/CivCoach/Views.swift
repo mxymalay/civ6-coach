@@ -152,7 +152,7 @@ struct MainView: View {
                 if !state.apiConfigured {
                     HStack(spacing: 12) {
                         Image(systemName: "key.horizontal").foregroundStyle(palette.gold)
-                        VStack(alignment: .leading, spacing: 4) { Text("接入你的 AI").font(.system(size: 12, weight: .medium)); Text("连接 Codex 或自定义 API，解锁分析与对话；基础提醒无需 AI。").font(.system(size: 11)).foregroundStyle(palette.secondary) }
+                        VStack(alignment: .leading, spacing: 4) { Text("接入你的 AI").font(.system(size: 12, weight: .medium)); Text("配置 API 后解锁分析与对话；基础提醒无需 AI。").font(.system(size: 11)).foregroundStyle(palette.secondary) }
                         Spacer()
                         Button("去配置") { state.settingsOpen = true }.buttonStyle(QuietButton())
                     }.padding(16).background(palette.gold.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
@@ -196,7 +196,7 @@ struct MainView: View {
                             if let turn = state.adviceTurn { Text("依据第 \(turn) 回合" + (turn != state.snapshot?.turn ? " · 旧建议" : "") + (!state.adviceComplete && !state.advice.isEmpty ? " · 未完成" : "")).font(.system(size: 10)).foregroundStyle(palette.secondary) }
                             if !state.advice.isEmpty { Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(state.advice, forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("复制建议") }
                         }
-                        if state.advice.isEmpty { Text(state.generating && state.selectedTab == "局势与建议" ? state.phase : "让老师结合当前局势，给你一个有理由的下一步。\n可以随时停止；Codex 通常在思考完成后显示回复。").font(.system(size: 12)).foregroundStyle(palette.secondary).lineSpacing(6).padding(.vertical, 8) }
+                        if state.advice.isEmpty { Text(state.generating && state.selectedTab == "局势与建议" ? state.phase : "让老师结合当前局势，给你一个有理由的下一步。\n建议会逐字出现，也可以随时停止。").font(.system(size: 12)).foregroundStyle(palette.secondary).lineSpacing(6).padding(.vertical, 8) }
                         else { MarkdownText(text: state.advice) }
                         HStack {
                             if state.generating { Button("停止生成") { state.stopGeneration() }.buttonStyle(QuietButton()) }
@@ -306,83 +306,6 @@ struct ChatView: View {
                 HStack { Text(state.apiConfigured ? state.modelLabel : "尚未配置 AI 模型"); Spacer(); Text("⌘ ↩ 发送 · 每次发送前刷新局势") }.font(.system(size: 9)).foregroundStyle(palette.secondary)
             }.padding(22).background(palette.sidebar.opacity(0.5))
         }
-    }
-}
-
-struct SettingsView: View {
-    private var palette: ThemePalette { draft.theme.palette }
-    @EnvironmentObject var state: AppState
-    @Environment(\.dismiss) var dismiss
-    @State private var draft = Settings()
-    @State private var key = ""
-    @State private var localError: String?
-    @State private var initialEndpoint = ""
-    @State private var initialKey = ""
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                VStack(alignment: .leading, spacing: 6) { Text("让你的 AI 成为陪练").font(.system(size: 23, weight: .medium, design: .serif)); Text("Codex 授权 · 自定义 API · 本机模型").font(.system(size: 12)).foregroundStyle(palette.secondary) }
-                Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 20)).foregroundStyle(palette.secondary) }.buttonStyle(.plain)
-            }
-            VStack(alignment: .leading, spacing: 15) {
-                Picker("AI 连接方式", selection: $draft.provider) { ForEach(AIProvider.allCases, id: \.self) { Text($0.title).tag($0) } }.pickerStyle(.segmented).disabled(state.testing)
-                if draft.provider == .api {
-                HStack { Text("接口类型").frame(width: 76, alignment: .leading); Picker("接口类型", selection: $draft.style) { ForEach(APIStyle.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.labelsHidden().pickerStyle(.segmented) }
-                settingField("API 地址") { TextField("https://api.openai.com/v1", text: $draft.endpoint).accessibilityIdentifier("api-endpoint") }
-                settingField("模型名称") { TextField("填写服务商提供的模型 ID", text: $draft.model).accessibilityIdentifier("api-model") }
-                settingField("API Key") { SecureField("本机无鉴权模型可留空", text: $key).accessibilityIdentifier("api-key") }
-                Text("密钥保存到 macOS 钥匙串。更换 API 地址会清空输入框中的旧密钥。").font(.system(size: 10)).foregroundStyle(palette.secondary)
-                } else {
-                    Text("使用官方 Codex CLI 的 ChatGPT 登录，无需粘贴 API Key。已登录 CLI 可直接检查授权。请求计入该账号的 Codex 用量。").font(.system(size: 11)).foregroundStyle(palette.secondary)
-                    settingField("模型（可选）") { TextField("留空使用 Codex 默认模型", text: $draft.codexModel) }
-                    settingField("CLI 路径") { TextField("自动查找；找不到时填写完整路径", text: $draft.codexPath) }
-                    HStack {
-                        Button("检查授权") { state.codexAuthorization(draft, login: false) }.buttonStyle(QuietButton()).disabled(state.testing)
-                        Button("登录 Codex") { state.codexAuthorization(draft, login: true) }.buttonStyle(QuietButton()).disabled(state.testing)
-                        Link("打开授权页", destination: URL(string: "https://auth.openai.com/codex/device")!)
-                    }
-                }
-                HStack {
-                    Button(state.testing ? "处理中…" : "测试连接") { state.testAPI(draft, key: key) }.buttonStyle(QuietButton()).disabled(state.testing || (draft.provider == .api && draft.model.isEmpty)).accessibilityIdentifier("test-api")
-                    if state.testing { ProgressView().controlSize(.small); Button("取消") { state.cancelTest() }.buttonStyle(.plain) }
-                    Text("发送一条简短测试，会消耗所选服务的用量。").font(.system(size: 9)).foregroundStyle(palette.secondary)
-                }
-                if let result = state.testResult { ScrollView { Text(result).font(.system(size: 11)).foregroundStyle(palette.secondary).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 90) }
-            }.font(.system(size: 12)).padding(20).background(palette.card, in: RoundedRectangle(cornerRadius: 14))
-            VStack(alignment: .leading, spacing: 15) {
-                Text("陪练偏好").font(.system(size: 13, weight: .semibold))
-                HStack {
-                    Text("界面主题"); Spacer()
-                    Picker("界面主题", selection: $draft.theme) { ForEach(AppTheme.allCases, id: \.self) { Text($0.title).tag($0) } }.labelsHidden().frame(width: 180)
-                }
-                HStack { Text("学习目标").frame(width: 76, alignment: .leading); TextField("例如：先学会基础运营 / 科技胜利", text: $draft.goal).textFieldStyle(.roundedBorder) }
-                HStack { Text("局势刷新"); Spacer(); Picker("局势刷新", selection: $draft.pollSeconds) { Text("每 5 秒").tag(5); Text("每 8 秒").tag(8); Text("每 15 秒").tag(15); Text("每 30 秒").tag(30) }.labelsHidden().frame(width: 140) }
-                Toggle("窗口保持在最前面", isOn: $draft.alwaysOnTop)
-                Toggle("向 AI 提供首都附近的可见地图", isOn: $draft.includeMap)
-                Toggle("在本机保存对话记录", isOn: $draft.rememberChat)
-                Text("关闭保存会移除当前对话的本地副本，历史归档仍保留。刷新局势不会自动调用 AI。").font(.system(size: 10)).foregroundStyle(palette.secondary)
-            }.font(.system(size: 12)).toggleStyle(.switch).controlSize(.small)
-            if let localError { Text(localError).font(.system(size: 11)).foregroundStyle(palette.gold) }
-            HStack {
-                Text(draft.provider == .codex ? "授权由官方 CLI 管理；应用不读取登录令牌。" : "AI 请求直接发往你填写的地址。").font(.system(size: 10)).foregroundStyle(palette.secondary)
-                Spacer()
-                Button("取消") { dismiss() }.buttonStyle(QuietButton())
-                Button("保存设置") {
-                    do { try state.saveSettings(draft, key: key); dismiss() } catch { localError = error.localizedDescription }
-                }.buttonStyle(PrimaryButton()).disabled(state.testing).accessibilityIdentifier("save-settings")
-            }
-        }.padding(28).frame(width: 620).background(palette.background).foregroundStyle(palette.primary)
-        .environment(\.coachTheme, draft.theme).preferredColorScheme(draft.theme.colorScheme)
-        .onAppear {
-            draft = state.settings; initialEndpoint = draft.endpoint; state.testResult = nil
-            do { key = try Keychain.load(account: draft.keyAccount); initialKey = key } catch { localError = error.localizedDescription }
-        }
-        .onChange(of: draft.endpoint) { value in key = value == initialEndpoint ? initialKey : ""; state.testResult = nil }
-        .onDisappear { state.cancelTest() }
-    }
-    private func settingField<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack { Text(title).frame(width: 76, alignment: .leading); content().textFieldStyle(.roundedBorder) }
     }
 }
 

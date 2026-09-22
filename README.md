@@ -7,8 +7,9 @@
 - 只读获取自身经济、城市、生产、研究、单位和首都附近可见地图。
 - 即时基础提醒（无需 AI）、一键 AI 建议、多轮中文聊天。
 - 自定义 OpenAI 兼容 API：Chat Completions / Responses，支持本机 HTTP；远程要求 HTTPS。
-- Codex 登录：通过官方 CLI 复用 ChatGPT 授权，支持设备授权、状态检查和模型选择。应用不读取或保存登录令牌。
-- 菜单栏地球图标：开关陪练、小窗查看建议、快速生成、进入聊天。
+- 菜单栏「文」图标：开关陪练、小窗查看建议、快速生成、进入聊天。
+- 快捷小窗可拖动、缩放；右上角图钉固定后持续置顶，取消固定后点击外部自动收起。尺寸与图钉状态自动保存。
+- 设置分为「API」「外观」「陪练与隐私」三页，共用保存按钮。
 - 森林绿、海军蓝、暮光紫、石墨黑、纯白五套主题；设置预览，保存后同步主窗口和菜单栏。
 - 可停止生成；API Key 保存在 macOS 钥匙串；对话可本机保存、归档、导出。
 
@@ -42,17 +43,7 @@ Steam macOS 常见配置位置：
 
 ## 配置 AI
 
-在「AI 与偏好设置」选择连接方式。
-
-### Codex 登录
-
-安装或使用已有的[官方 Codex CLI](https://developers.openai.com/codex/cli/)。点击「检查授权」；已经通过 ChatGPT 登录可直接使用。否则点击「登录 Codex」，按显示的设备授权说明在官方页面完成登录，然后测试并保存。
-
-自动查找 `~/.local/bin`、Homebrew、`/usr/local/bin` 和标准位置的 Codex.app，也可手动填写可执行文件路径。需要支持 `exec --ignore-user-config` 的较新 CLI；旧版本请先更新。
-
-此方式消耗账号的 Codex 用量，不等于免费 API。每次使用临时会话、空工作目录、只读沙箱，并关闭 shell、搜索、插件和应用工具。Codex 以完整消息回复，不保证逐字流式输出。共享账号的登录状态由 CLI 自己管理。
-
-### 自定义 API
+在设置的「API」页配置服务。应用已移除 Codex 登录和 CLI 调用功能；升级保留原有 API、主题及其他偏好，不修改本机 Codex 账号。
 
 填写服务地址、模型 ID 和 API Key，测试并保存。本机无鉴权服务可留空密钥。密钥不写入项目或设置 JSON；更换地址时输入框清空旧密钥。测试和生成会消耗所选服务的用量或费用。
 
@@ -72,8 +63,8 @@ Steam macOS 常见配置位置：
 
 ```sh
 swift test
-# 可选：需游戏已载入 / CLI 已登录，会读取游戏或消耗少量 Codex 用量
-CIVCOACH_LIVE_TEST=1 CIVCOACH_CODEX_TEST=1 swift test
+# 可选：需游戏已载入，会读取真实游戏数据
+CIVCOACH_LIVE_TEST=1 swift test
 ```
 
 默认测试用本地 HTTP 服务检查流解析、中文片段、错误、取消及 JSON 回退，不需真实 API Key。可选 Python MCP 桥接器见 [bridge](bridge/README.md)。

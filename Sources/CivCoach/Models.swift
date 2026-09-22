@@ -67,15 +67,8 @@ enum APIStyle: String, Codable, CaseIterable {
     case chat = "Chat Completions"
     case responses = "Responses"
 }
-enum AIProvider: String, Codable, CaseIterable {
-    case api, codex
-    var title: String { self == .api ? "自定义 API" : "Codex 登录" }
-}
 struct Settings: Codable, Equatable {
     var theme: AppTheme = .forest
-    var provider: AIProvider = .api
-    var codexModel = ""
-    var codexPath = ""
     var endpoint = "https://api.openai.com/v1"
     var model = ""
     var style: APIStyle = .chat
@@ -86,14 +79,11 @@ struct Settings: Codable, Equatable {
     var goal = "先学会基础运营"
     init() {}
     enum CodingKeys: String, CodingKey {
-        case theme, provider, codexModel, codexPath, endpoint, model, style, pollSeconds, alwaysOnTop, rememberChat, includeMap, goal
+        case theme, endpoint, model, style, pollSeconds, alwaysOnTop, rememberChat, includeMap, goal
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         theme = (try? c.decodeIfPresent(AppTheme.self, forKey: .theme)) ?? .forest
-        provider = try c.decodeIfPresent(AIProvider.self, forKey: .provider) ?? .api
-        codexModel = try c.decodeIfPresent(String.self, forKey: .codexModel) ?? ""
-        codexPath = try c.decodeIfPresent(String.self, forKey: .codexPath) ?? ""
         endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? "https://api.openai.com/v1"
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
         style = try c.decodeIfPresent(APIStyle.self, forKey: .style) ?? .chat

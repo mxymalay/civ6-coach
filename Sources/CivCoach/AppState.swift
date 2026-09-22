@@ -43,8 +43,8 @@ import AppKit
             restoredHistoryCount = messages.count
         }
     }
-    var apiConfigured: Bool { settings.provider == .codex || !settings.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    var modelLabel: String { settings.provider == .codex ? "Codex · " + (settings.codexModel.isEmpty ? "默认模型" : settings.codexModel) : settings.model }
+    var apiConfigured: Bool { !settings.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var modelLabel: String { settings.model }
     var live: Bool { enabled && connectionError == nil && snapshot != nil }
     var status: String {
         if !enabled { return "陪练已暂停" }
@@ -103,10 +103,7 @@ import AppKit
         guard enabled, !generating else { return false }
         guard apiConfigured else { settingsOpen = true; return false }
         let key: String
-        do {
-            if settings.provider == .api { _ = try settings.validatedURL(); key = try Keychain.load(account: settings.keyAccount) }
-            else { _ = try CodexClient.executable(settings: settings); key = "" }
-        }
+        do { _ = try settings.validatedURL(); key = try Keychain.load(account: settings.keyAccount) }
         catch { self.error = error.localizedDescription; settingsOpen = true; return false }
         runID = UUID(); let id = runID
         generating = true; error = nil; phase = "正在读取最新局势…"
@@ -142,11 +139,7 @@ import AppKit
                     await self?.acceptDelta(delta, run: id, target: targetID, isAdvice: isAdvice)
                 }
                 let system = teachingPrompt + "\n玩家的目标：" + config.goal
-                if config.provider == .codex {
-                    try await CodexClient.stream(settings: config, messages: chat, system: system, onDelta: receive)
-                } else {
-                    try await AIClient.stream(settings: config, key: key, messages: chat, system: system, onDelta: receive)
-                }
+                try await AIClient.stream(settings: config, key: key, messages: chat, system: system, onDelta: receive)
                 try Task.checkCancellation()
                 if isAdvice && id == self.runID { self.adviceComplete = true }
             } catch is CancellationError {
@@ -177,10 +170,8 @@ import AppKit
         else if let target, let index = messages.firstIndex(where: { $0.id == target }) { messages[index].text += delta }
     }
     func saveSettings(_ value: Settings, key: String) throws {
-        if value.provider == .api {
-            _ = try value.validatedURL()
-            try Keychain.save(key.trimmingCharacters(in: .whitespacesAndNewlines), account: value.keyAccount)
-        } else { _ = try CodexClient.executable(settings: value) }
+        _ = try value.validatedURL()
+        try Keychain.save(key.trimmingCharacters(in: .whitespacesAndNewlines), account: value.keyAccount)
         settings = value
         Self.preferences.set(try JSONEncoder().encode(value), forKey: "coach.settings.v1")
         for window in NSApp.windows where window.identifier?.rawValue == "coach-main" { window.level = value.alwaysOnTop ? .floating : .normal }
@@ -193,36 +184,13 @@ import AppKit
         testTask = Task {
             defer { testing = false }
             do {
-                if value.provider == .codex {
-                    try await CodexClient.stream(settings: value, messages: [["role":"user", "content":"只回复：连接成功"]], system: "这是连接测试，请简短回答。") { _ in }
-                } else {
-                    try await AIClient.stream(settings: value, key: key, messages: [["role":"user", "content":"只回复：连接成功"]], system: "这是连接测试，请简短回答。") { _ in }
-                }
+                try await AIClient.stream(settings: value, key: key, messages: [["role":"user", "content":"只回复：连接成功"]], system: "这是连接测试，请简短回答。") { _ in }
                 testResult = "连接成功，可以开始聊天。"
             } catch is CancellationError { testResult = "测试已取消。" }
             catch { testResult = error.localizedDescription }
         }
     }
     func cancelTest() { testTask?.cancel() }
-    func codexAuthorization(_ value: Settings, login: Bool) {
-        guard !testing else { return }
-        testing = true; testResult = nil
-        testTask = Task {
-            defer { testing = false }
-            do {
-                if login {
-                    testResult = "正在启动官方 Codex 授权…"
-                    try await CodexClient.login(settings: value) { [self] line in
-                        let clean = line.replacingOccurrences(of: "\u{1B}\\[[0-9;]*[a-zA-Z]", with: "", options: .regularExpression)
-                        await self.appendAuthorizationProgress(clean)
-                    }
-                }
-                testResult = try await CodexClient.status(settings: value)
-            } catch is CancellationError { testResult = "授权检查已取消。" }
-            catch { testResult = error.localizedDescription }
-        }
-    }
-    private func appendAuthorizationProgress(_ line: String) { testResult = String(((testResult ?? "") + "\n" + line).suffix(2500)) }
     func archiveAndClear(force: Bool = false) {
         guard force || !generating else { return }
         if settings.rememberChat && !messages.isEmpty {
