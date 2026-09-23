@@ -95,14 +95,14 @@ struct MenuContent: View {
                 Spacer()
                 if state.generating {
                     ProgressView().controlSize(.mini)
-                    Button("停止") { state.stopGeneration() }.buttonStyle(.bordered).controlSize(.small).help(state.phase)
+                    Button("停止") { state.stopGeneration() }.buttonStyle(CompactActionButton()).help(state.phase)
                 } else {
                     Button {
                         if state.apiConfigured { state.askAdvice() } else { quickPanel.showMain(settings: true) }
                     } label: { Label("建议", systemImage: "sparkles") }
-                        .buttonStyle(.bordered).controlSize(.small).tint(palette.mint)
+                        .buttonStyle(CompactActionButton(prominent: true))
                 }
-            }.buttonStyle(.plain).font(.system(size: 12))
+            }.buttonStyle(CompactActionButton()).font(.system(size: 12))
         }.padding(12).frame(minWidth: 320, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity).background(palette.background).foregroundStyle(palette.primary).preferredColorScheme(theme.colorScheme)
     }
 }

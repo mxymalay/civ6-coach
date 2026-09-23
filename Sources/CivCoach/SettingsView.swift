@@ -10,12 +10,16 @@ struct SettingsView: View {
     @Environment(\.coachTheme) private var inheritedTheme
     @State private var draft = Settings()
     @State private var page = SettingsPage.api
-    @State private var key = ""
+    @State private var keys: [UUID: String] = [:]
     @State private var localError: String?
-    @State private var initialEndpoint = ""
-    @State private var initialKey = ""
+    @State private var initialEndpoints: [UUID: String] = [:]
+    @State private var initialKeys: [UUID: String] = [:]
+    @State private var editingProfileName = false
+    @State private var customGoal = false
+    @State private var customGoalText = ""
     @FocusState private var focusedField: FocusField?
-    private enum FocusField: Hashable { case endpoint, model, key, goal }
+    private enum FocusField: Hashable { case name, endpoint, model, key, goal }
+    private var key: String { keys[draft.selectedAPIID] ?? "" }
     private var themeStyle: AppThemeStyle {
         AppThemeStyle(accent: draft.theme, appearance: draft.appearance, systemColorScheme: inheritedTheme.systemColorScheme)
     }
@@ -45,32 +49,62 @@ struct SettingsView: View {
                 Spacer()
                 Button("取消") { dismiss() }.buttonStyle(QuietButton())
                 Button("保存设置") {
-                    do { try state.saveSettings(draft, key: key); dismiss() }
+                    do { try state.saveSettings(draft, keys: keys); dismiss() }
                     catch { localError = error.localizedDescription; page = .api }
-                }.buttonStyle(PrimaryButton()).disabled(state.testing).accessibilityIdentifier("save-settings")
+                }.buttonStyle(PrimaryButton())
+                    .disabled(state.testing || state.generating || draft.apiProfiles.contains { keys[$0.id] == nil })
+                    .accessibilityIdentifier("save-settings")
             }
         }.padding(28).frame(width: 620, height: 570).background(palette.background).foregroundStyle(palette.primary)
         .environment(\.coachTheme, themeStyle).preferredColorScheme(draft.appearance.preferredColorScheme)
         .onAppear {
-            draft = state.settings; initialEndpoint = draft.endpoint; state.clearTestResult()
-            do { key = try Keychain.load(account: draft.keyAccount); initialKey = key }
-            catch { localError = error.localizedDescription }
+            draft = state.settings; state.clearTestResult()
+            for profile in draft.apiProfiles {
+                initialEndpoints[profile.id] = profile.endpoint
+                do { keys[profile.id] = try Keychain.load(account: profile.keyAccount) }
+                catch { localError = error.localizedDescription }
+            }
+            initialKeys = keys
+            customGoal = !LearningGoalPreset.allCases.contains { $0.prompt == draft.goal }
+            customGoalText = customGoal ? draft.goal : ""
         }
-        .onChange(of: draft.endpoint) { value in key = value == initialEndpoint ? initialKey : ""; state.clearTestResult() }
         .onChange(of: draft.model) { _ in state.clearTestResult() }
         .onChange(of: draft.style) { _ in state.clearTestResult() }
         .onChange(of: key) { _ in state.clearTestResult() }
         .onDisappear { state.cancelTest() }
     }
     private var apiPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("自定义 API").font(.system(size: 15, weight: .semibold))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                APIProfileMenu(profiles: draft.apiProfiles, selectedID: draft.selectedAPIID) { id in
+                    draft.selectAPIProfile(id); editingProfileName = false
+                    focusedField = nil; state.clearTestResult()
+                }
+                Button { addProfile() } label: { Image(systemName: "plus").frame(width: 22, height: 22) }
+                    .buttonStyle(CompactActionButton()).help("新增 API 配置").accessibilityLabel("新增 API 配置")
+                Button { editingProfileName.toggle(); focusedField = editingProfileName ? .name : nil } label: {
+                    Image(systemName: "pencil").frame(width: 22, height: 22)
+                }.buttonStyle(CompactActionButton()).help("重命名配置").accessibilityLabel("重命名配置")
+                Button { removeProfile() } label: { Image(systemName: "trash").frame(width: 22, height: 22) }
+                    .buttonStyle(CompactActionButton()).help("删除当前配置，保存后生效").accessibilityLabel("删除当前 API 配置")
+            }
+            if editingProfileName {
+                field("配置名称", focused: focusedField == .name) {
+                    TextField("给这套 API 起个名字", text: $draft.profileName)
+                        .focused($focusedField, equals: .name)
+                        .onSubmit { editingProfileName = false }
+                }
+            }
             HStack(spacing: 12) {
                 Text("接口类型").frame(width: 76, alignment: .leading)
                 CoachChoiceBar(selection: $draft.style, choices: APIStyle.allCases, title: { $0.rawValue })
             }
             field("API 地址", focused: focusedField == .endpoint) {
-                TextField("https://api.openai.com/v1", text: $draft.endpoint)
+                TextField("https://api.openai.com/v1", text: Binding(get: { draft.endpoint }, set: { value in
+                    draft.endpoint = value
+                    keys[draft.selectedAPIID] = value == initialEndpoints[draft.selectedAPIID] ? initialKeys[draft.selectedAPIID] ?? "" : ""
+                    state.clearTestResult()
+                }))
                     .focused($focusedField, equals: .endpoint).accessibilityIdentifier("api-endpoint")
             }
             field("模型名称", focused: focusedField == .model) {
@@ -78,10 +112,10 @@ struct SettingsView: View {
                     .focused($focusedField, equals: .model).accessibilityIdentifier("api-model")
             }
             field("API Key", focused: focusedField == .key) {
-                SecureField("本机无鉴权模型可留空", text: $key)
+                SecureField("本机无鉴权模型可留空", text: Binding(get: { key }, set: { keys[draft.selectedAPIID] = $0 }))
                     .focused($focusedField, equals: .key).accessibilityIdentifier("api-key")
             }
-            Text("密钥保存到 macOS 钥匙串。更换地址会清空密钥输入，改回原地址会恢复。请求直接发送到你填写的地址。").font(.system(size: 10)).foregroundStyle(palette.secondary)
+            Text("密钥存于本机钥匙串；更换地址会清空密钥。").font(.system(size: 10)).foregroundStyle(palette.secondary)
             HStack(spacing: 10) {
                 Button(state.testing ? "测试中…" : "测试连接") { state.testAPI(draft, key: key) }.buttonStyle(QuietButton()).disabled(state.testing || draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("test-api")
                 if state.testing { ProgressView().controlSize(.small); Button("停止测试") { state.cancelTest() }.buttonStyle(.plain) }
@@ -123,11 +157,24 @@ struct SettingsView: View {
     private var coachingPage: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("陪练与隐私").font(.system(size: 15, weight: .semibold))
-            field("学习目标", focused: focusedField == .goal) {
-                TextField("例如：基础运营 / 科技胜利", text: $draft.goal)
-                    .focused($focusedField, equals: .goal)
+            Text("学习目标").font(.system(size: 12, weight: .medium))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(LearningGoalPreset.allCases, id: \.self) { preset in
+                    goalChoice(preset.rawValue, icon: preset.icon, selected: !customGoal && draft.goal == preset.prompt) {
+                        if customGoal { customGoalText = draft.goal }
+                        customGoal = false; draft.goal = preset.prompt; focusedField = nil
+                    }
+                }
+                goalChoice("自定义", icon: "pencil", selected: customGoal) {
+                    if !customGoal { draft.goal = customGoalText }
+                    customGoal = true; focusedField = .goal
+                }
             }
-            Text("这段文字会附加到 AI 的教师提示词中，不是整套模板。可写“先学基础运营”“科技胜利”“文化胜利”或“征服胜利”，也可以自由描述。").font(.system(size: 11)).foregroundStyle(palette.secondary)
+            if customGoal {
+                TextField("想重点学什么？", text: $draft.goal)
+                    .focused($focusedField, equals: .goal)
+                    .modifier(CoachInputStyle(focused: focusedField == .goal))
+            }
             HStack(spacing: 12) {
                 Text("局势刷新").frame(width: 76, alignment: .leading)
                 CoachChoiceBar(selection: $draft.pollSeconds, choices: [5, 8, 15, 30], title: { "每 \($0) 秒" })
@@ -137,6 +184,31 @@ struct SettingsView: View {
             Toggle("在本机保存对话记录", isOn: $draft.rememberChat)
             Text("关闭保存会移除当前对话的本地副本，历史归档仍保留。游戏读取仅在本机进行，刷新不会自动调用 AI。只有点建议或发送聊天时，才将相关数据发送到 API。").font(.system(size: 11)).foregroundStyle(palette.secondary).lineSpacing(5)
         }.font(.system(size: 12)).toggleStyle(.switch).tint(palette.mint).controlSize(.small)
+    }
+    private func addProfile() {
+        let id = draft.addAPIProfile()
+        keys[id] = ""; initialKeys[id] = ""; initialEndpoints[id] = draft.endpoint
+        editingProfileName = true; focusedField = .name; state.clearTestResult()
+    }
+    private func removeProfile() {
+        let oldIDs = Set(draft.apiProfiles.map(\.id))
+        keys.removeValue(forKey: draft.selectedAPIID)
+        draft.removeAPIProfile(draft.selectedAPIID)
+        if !oldIDs.contains(draft.selectedAPIID) {
+            keys[draft.selectedAPIID] = ""; initialKeys[draft.selectedAPIID] = ""
+            initialEndpoints[draft.selectedAPIID] = draft.endpoint
+        }
+        editingProfileName = false; focusedField = nil; state.clearTestResult()
+    }
+    private func goalChoice(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) { Image(systemName: icon); Text(title) }
+                .font(.system(size: 11, weight: .medium))
+                .frame(maxWidth: .infinity).padding(.vertical, 10)
+                .foregroundStyle(selected ? palette.mint : palette.secondary)
+                .background(selected ? palette.mint.opacity(0.10) : palette.sidebar, in: RoundedRectangle(cornerRadius: 9))
+                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(selected ? palette.mint.opacity(0.6) : palette.line))
+        }.buttonStyle(.plain).accessibilityValue(selected ? "已选择" : "未选择")
     }
     private func field<Content: View>(_ title: String, focused: Bool, @ViewBuilder content: () -> Content) -> some View {
         HStack(spacing: 12) {

@@ -117,7 +117,7 @@ enum APITestResult: Equatable {
         }
     }
     func askAdvice() {
-        request("根据最新局势，告诉我本回合优先做的三件事。请具体、简短，并解释原因和一个备选。", isAdvice: true)
+        request("根据最新局势，最多给三条本回合行动，每条一句，包含行动和简短理由。总计不超过180字，不写开场白、复述数据或长篇分析。", isAdvice: true)
     }
     func sendDraft() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -164,9 +164,15 @@ enum APITestResult: Equatable {
                     await self?.acceptDelta(delta, run: id, target: targetID, isAdvice: isAdvice)
                 }
                 let system = teachingPrompt + "\n玩家的目标：" + config.goal
-                try await AIClient.stream(settings: config, key: key, messages: chat, system: system, onDelta: receive)
+                    + (isAdvice ? "\n本次为快速建议：最多三条，每条一句，总计不超过180字。只输出行动和简短理由，不展开分析。" : "")
+                let result = try await AIClient.stream(settings: config, key: key, messages: chat, system: system, budget: isAdvice ? .advice : .chat, onDelta: receive)
                 try Task.checkCancellation()
-                if isAdvice && id == self.runID { self.adviceComplete = true }
+                if id == self.runID {
+                    if isAdvice { self.adviceComplete = result == .completed }
+                    else if result == .limited, let messageID, let i = self.messages.firstIndex(where: { $0.id == messageID }) {
+                        self.messages[i].interrupted = true
+                    }
+                }
             } catch is CancellationError {
                 if let messageID, let i = self.messages.firstIndex(where: { $0.id == messageID }) {
                     self.messages[i].interrupted = true
@@ -194,14 +200,26 @@ enum APITestResult: Equatable {
         if isAdvice { advice += delta }
         else if let target, let index = messages.firstIndex(where: { $0.id == target }) { messages[index].text += delta }
     }
-    func saveSettings(_ value: Settings, key: String) throws {
-        _ = try value.validatedURL()
-        try Keychain.save(key.trimmingCharacters(in: .whitespacesAndNewlines), account: value.keyAccount)
+    func saveSettings(_ value: Settings, keys: [UUID: String]) throws {
+        for profile in value.apiProfiles {
+            var selected = value; selected.selectAPIProfile(profile.id)
+            _ = try selected.validatedURL()
+        }
+        let encoded = try JSONEncoder().encode(value)
+        try APIProfileCredentials.apply(previous: settings, next: value, keys: keys)
+        Self.preferences.set(encoded, forKey: "coach.settings.v1")
         settings = value
-        Self.preferences.set(try JSONEncoder().encode(value), forKey: "coach.settings.v1")
         applyMainWindowLevel()
         if !value.rememberChat { try? FileManager.default.removeItem(at: Self.dataFolder.appendingPathComponent("conversation.json")) }
         else { persistChat() }
+    }
+    func selectAPIProfile(_ id: UUID) {
+        guard !generating, !testing, settings.apiProfiles.contains(where: { $0.id == id }) else { return }
+        var updated = settings; updated.selectAPIProfile(id)
+        do {
+            Self.preferences.set(try JSONEncoder().encode(updated), forKey: "coach.settings.v1")
+            settings = updated; error = nil; clearTestResult()
+        } catch { self.error = "切换 API 配置失败。" }
     }
     func toggleMainPin() {
         var updated = settings
@@ -224,7 +242,7 @@ enum APITestResult: Equatable {
         testTask = Task {
             defer { if id == testID { testing = false } }
             do {
-                try await AIClient.stream(settings: value, key: key, messages: [["role":"user", "content":"只回复：连接成功"]], system: "这是连接测试，请简短回答。") { _ in }
+                try await AIClient.stream(settings: value, key: key, messages: [["role":"user", "content":"只回复：连接成功"]], system: "这是连接测试，请简短回答。", budget: .connectionTest) { _ in }
                 if id == testID { testResult = .success }
             } catch is CancellationError { if id == testID { testResult = .cancelled } }
             catch { if id == testID { testResult = .failure(error.localizedDescription) } }

@@ -24,6 +24,47 @@ struct QuietButton: ButtonStyle {
             .foregroundStyle(palette.primary.opacity(configuration.isPressed ? 0.6 : 0.86)).background(palette.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 9))
     }
 }
+struct CompactActionButton: ButtonStyle {
+    @Environment(\.coachTheme) private var theme
+    @Environment(\.isEnabled) private var enabled
+    var prominent = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.system(size: 11, weight: .medium))
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .foregroundStyle(prominent ? theme.palette.mint : theme.palette.secondary)
+            .background((prominent ? theme.palette.mint : theme.palette.primary).opacity(configuration.isPressed ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 7))
+            .opacity(enabled ? 1 : 0.4)
+    }
+}
+
+struct APIProfileMenu: View {
+    @Environment(\.coachTheme) private var theme
+    let profiles: [APIProfile]
+    let selectedID: UUID
+    let onSelect: (UUID) -> Void
+    var body: some View {
+        Menu {
+            ForEach(profiles) { profile in
+                Button { onSelect(profile.id) } label: {
+                    if profile.id == selectedID { Label(profile.displayName, systemImage: "checkmark") }
+                    else { Text(profile.displayName) }
+                }
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "server.rack").foregroundStyle(theme.palette.mint)
+                Text(profiles.first { $0.id == selectedID }?.displayName ?? "API").lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+            }.font(.system(size: 11, weight: .medium)).foregroundStyle(theme.palette.primary)
+                .padding(.horizontal, 10).padding(.vertical, 9)
+                .background(theme.palette.sidebar, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.palette.line))
+        }.menuStyle(.borderlessButton).menuIndicator(.hidden)
+            .help("切换 API 配置").accessibilityLabel("API 配置")
+    }
+}
+
 struct CoachInputStyle: ViewModifier {
     @Environment(\.coachTheme) private var theme
     var focused: Bool
@@ -162,6 +203,8 @@ struct MainView: View {
             }
             Spacer()
             if state.generating { ProgressView().controlSize(.small); Text(state.phase).font(.system(size: 11)).foregroundStyle(palette.secondary) }
+            APIProfileMenu(profiles: state.settings.apiProfiles, selectedID: state.settings.selectedAPIID, onSelect: state.selectAPIProfile)
+                .frame(width: 150).disabled(state.generating || state.testing)
             Button { state.refresh() } label: { Label(state.refreshing ? "读取中" : "刷新局势", systemImage: "arrow.clockwise") }
                 .buttonStyle(QuietButton()).disabled(state.refreshing || state.generating).keyboardShortcut("r", modifiers: .command)
             Button { state.toggleMainPin() } label: {

@@ -79,20 +79,80 @@ enum APIStyle: String, Codable, CaseIterable {
     case chat = "Chat Completions"
     case responses = "Responses"
 }
-struct Settings: Codable, Equatable {
-    var theme: AppTheme = .forest
-    var appearance: AppAppearance = .system
+struct APIProfile: Codable, Equatable, Identifiable {
+    var id = UUID()
+    var name = "默认配置"
     var endpoint = "https://api.openai.com/v1"
     var model = ""
     var style: APIStyle = .chat
+    // Keep the original account address when migrating; new profiles always
+    // have independent credentials even when they share an endpoint.
+    var legacyKeyAccount: String?
+    var keyAccount: String { legacyKeyAccount ?? "profile.\(id.uuidString)" }
+    var displayName: String { name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "未命名配置" : name }
+}
+
+enum LearningGoalPreset: String, CaseIterable {
+    case basics = "基础运营", science = "科技胜利", culture = "文化胜利", domination = "征服胜利", religion = "宗教胜利"
+    var prompt: String { self == .basics ? "先学会基础运营" : rawValue }
+    var icon: String {
+        switch self {
+        case .basics: return "leaf"
+        case .science: return "flask"
+        case .culture: return "building.columns"
+        case .domination: return "shield"
+        case .religion: return "sun.max"
+        }
+    }
+}
+
+struct Settings: Codable, Equatable {
+    var theme: AppTheme = .forest
+    var appearance: AppAppearance = .system
+    private(set) var apiProfiles: [APIProfile]
+    private(set) var selectedAPIID: UUID
+    private var selectedIndex: Int { apiProfiles.firstIndex { $0.id == selectedAPIID } ?? 0 }
+    var selectedAPI: APIProfile { apiProfiles[selectedIndex] }
+    var profileName: String {
+        get { selectedAPI.name }
+        set { apiProfiles[selectedIndex].name = newValue }
+    }
+    var endpoint: String {
+        get { selectedAPI.endpoint }
+        set { apiProfiles[selectedIndex].endpoint = newValue }
+    }
+    var model: String {
+        get { selectedAPI.model }
+        set { apiProfiles[selectedIndex].model = newValue }
+    }
+    var style: APIStyle {
+        get { selectedAPI.style }
+        set { apiProfiles[selectedIndex].style = newValue }
+    }
     var pollSeconds = 8
     var alwaysOnTop = false
     var rememberChat = true
     var includeMap = true
     var goal = "先学会基础运营"
-    init() {}
+    init() {
+        let profile = APIProfile()
+        apiProfiles = [profile]; selectedAPIID = profile.id
+    }
+    mutating func selectAPIProfile(_ id: UUID) {
+        if apiProfiles.contains(where: { $0.id == id }) { selectedAPIID = id }
+    }
+    @discardableResult mutating func addAPIProfile() -> UUID {
+        var profile = APIProfile(); profile.name = "新配置"
+        apiProfiles.append(profile); selectedAPIID = profile.id
+        return profile.id
+    }
+    mutating func removeAPIProfile(_ id: UUID) {
+        apiProfiles.removeAll { $0.id == id }
+        if apiProfiles.isEmpty { apiProfiles = [APIProfile(name: "新配置")] }
+        if !apiProfiles.contains(where: { $0.id == selectedAPIID }) { selectedAPIID = apiProfiles[0].id }
+    }
     enum CodingKeys: String, CodingKey {
-        case theme, appearance, endpoint, model, style, pollSeconds, alwaysOnTop, rememberChat, includeMap, goal
+        case theme, appearance, endpoint, model, style, pollSeconds, alwaysOnTop, rememberChat, includeMap, goal, apiProfiles, selectedAPIID
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -100,16 +160,34 @@ struct Settings: Codable, Equatable {
         theme = oldTheme ?? .forest
         appearance = (try? c.decodeIfPresent(AppAppearance.self, forKey: .appearance))
             ?? (oldTheme == nil ? .system : (oldTheme == .white ? .light : .dark))
-        endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? "https://api.openai.com/v1"
-        model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
-        style = try c.decodeIfPresent(APIStyle.self, forKey: .style) ?? .chat
+        if let profiles = try c.decodeIfPresent([APIProfile].self, forKey: .apiProfiles), !profiles.isEmpty {
+            var seen = Set<UUID>()
+            apiProfiles = profiles.filter { seen.insert($0.id).inserted }
+            let selected = try c.decodeIfPresent(UUID.self, forKey: .selectedAPIID)
+            selectedAPIID = apiProfiles.first(where: { $0.id == selected })?.id ?? apiProfiles[0].id
+        } else {
+            var profile = APIProfile()
+            profile.endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? "https://api.openai.com/v1"
+            profile.model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
+            profile.style = try c.decodeIfPresent(APIStyle.self, forKey: .style) ?? .chat
+            profile.legacyKeyAccount = profile.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+            apiProfiles = [profile]; selectedAPIID = profile.id
+        }
         pollSeconds = max(5, min(60, try c.decodeIfPresent(Int.self, forKey: .pollSeconds) ?? 8))
         alwaysOnTop = try c.decodeIfPresent(Bool.self, forKey: .alwaysOnTop) ?? false
         rememberChat = try c.decodeIfPresent(Bool.self, forKey: .rememberChat) ?? true
         includeMap = try c.decodeIfPresent(Bool.self, forKey: .includeMap) ?? true
         goal = try c.decodeIfPresent(String.self, forKey: .goal) ?? "先学会基础运营"
     }
-    var keyAccount: String { endpoint.trimmingCharacters(in: .whitespacesAndNewlines) }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(theme, forKey: .theme); try c.encode(appearance, forKey: .appearance)
+        try c.encode(apiProfiles, forKey: .apiProfiles); try c.encode(selectedAPIID, forKey: .selectedAPIID)
+        try c.encode(pollSeconds, forKey: .pollSeconds); try c.encode(alwaysOnTop, forKey: .alwaysOnTop)
+        try c.encode(rememberChat, forKey: .rememberChat); try c.encode(includeMap, forKey: .includeMap)
+        try c.encode(goal, forKey: .goal)
+    }
+    var keyAccount: String { selectedAPI.keyAccount }
     func validatedURL() throws -> URL {
         let raw = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: raw), let host = url.host, !host.isEmpty,

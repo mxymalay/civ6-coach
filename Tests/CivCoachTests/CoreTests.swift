@@ -34,7 +34,22 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(try parser.consume(#"{"type":"response.output_text.delta","delta":"老师"}"#), "老师")
         _ = try parser.consume("[DONE]"); XCTAssertTrue(parser.completed)
         XCTAssertThrowsError(try parser.consume(#"{"type":"response.failed"}"#))
-        XCTAssertThrowsError(try parser.consume(#"{"choices":[{"finish_reason":"length","delta":{}}]}"#))
+        XCTAssertEqual(try parser.consume(#"{"choices":[{"finish_reason":"length","delta":{"content":"尾"}}]}"#), "尾")
+        XCTAssertTrue(parser.limited)
+    }
+    func testRequestBudgetsForBothProtocolsAndReasoningModels() throws {
+        for style in APIStyle.allCases {
+            for model in ["mock", "gpt-5.4", "openai/o3"] {
+                for budget in [AIOutputBudget.advice, .chat, .connectionTest] {
+                    var settings = Settings(); settings.style = style; settings.model = model
+                    let request = try AIClient.makeRequest(settings: settings, key: "", messages: [], system: "老师", budget: budget)
+                    let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+                    let field = style == .responses ? "max_output_tokens" : (model == "mock" ? "max_tokens" : "max_completion_tokens")
+                    XCTAssertEqual(body[field] as? Int, budget.tokens)
+                    XCTAssertEqual(["max_tokens", "max_completion_tokens", "max_output_tokens"].filter { body[$0] != nil }.count, 1)
+                }
+            }
+        }
     }
     func testUnknownFieldsDoNotBecomeZero() throws {
         let rows: [Record] = [["kind": .string("meta"), "turn": .number(4)], ["kind": .string("city"), "name": .string("首都")]]
@@ -77,6 +92,56 @@ actor TextCollector {
     func value() -> String { text }
 }
 final class APIIntegrationTests: XCTestCase {
+    func testLongAnswerStopsBeforeFloodingTheUI() async throws {
+        for style in APIStyle.allCases {
+            for model in ["long", "json-long"] {
+                for budget in [AIOutputBudget.advice, .chat, .connectionTest] {
+                    let collector = TextCollector()
+                    let result = try await AIClient.stream(settings: settings(model, style), key: "", messages: [], system: "老师", budget: budget) { await collector.append($0) }
+                    let text = await collector.value()
+                    XCTAssertEqual(text.count, budget.characters)
+                    XCTAssertEqual(result, .limited)
+                }
+            }
+        }
+    }
+    func testBudgetExhaustionKeepsPartialAnswerWithoutClaimingCompletion() async throws {
+        for style in APIStyle.allCases {
+            for model in ["budget", "json-budget"] {
+                let collector = TextCollector()
+                let result = try await AIClient.stream(settings: settings(model, style), key: "", messages: [], system: "老师") { await collector.append($0) }
+                let text = await collector.value()
+                XCTAssertEqual(result, .limited)
+                XCTAssertEqual(text, model == "json-budget" ? "已有建议" : (style == .chat ? "先发展城市。尾" : "先发展城市。"))
+            }
+        }
+    }
+    func testBudgetWithoutAnyAnswerStillReportsFailure() async {
+        for style in APIStyle.allCases {
+            do {
+                try await AIClient.stream(settings: settings("reasoning-budget", style), key: "", messages: [], system: "老师") { _ in }
+                XCTFail("A reasoning-only response is not usable advice")
+            } catch { XCTAssertTrue(error.localizedDescription.contains("没有返回答案")) }
+        }
+    }
+    func testReasoningTransportOverheadDoesNotRejectShortAnswer() async throws {
+        for style in APIStyle.allCases {
+            let collector = TextCollector()
+            try await AIClient.stream(settings: settings("metadata", style), key: "", messages: [], system: "老师") { await collector.append($0) }
+            let text = await collector.value()
+            XCTAssertEqual(text, "先发展城市。")
+        }
+    }
+    func testTransportStillRejectsRunawayDataAndOversizedEvents() async {
+        for model in ["metadata-flood", "oversized-event"] {
+            do {
+                try await AIClient.stream(settings: settings(model), key: "", messages: [], system: "老师") { _ in }
+                XCTFail("Runaway transport must still be bounded")
+            } catch {
+                XCTAssertTrue(error.localizedDescription.contains(model == "metadata-flood" ? "过多数据" : "单条数据"))
+            }
+        }
+    }
     func testIncompleteJSONIsRejected() async {
         for style in APIStyle.allCases {
             do {
@@ -129,6 +194,27 @@ final class APIIntegrationTests: XCTestCase {
         let task = Task { try await AIClient.stream(settings: s, key: "", messages: [], system: "老师") { _ in } }
         try await Task.sleep(nanoseconds: 150_000_000)
         task.cancel()
-        do { try await task.value; XCTFail("Expected cancellation") } catch { XCTAssertTrue(error is CancellationError) }
+        do { _ = try await task.value; XCTFail("Expected cancellation") } catch { XCTAssertTrue(error is CancellationError) }
+    }
+}
+
+final class LiveAPIRegressionTests: XCTestCase {
+    func testConfiguredAPIWithSyntheticAdviceIfRequested() async throws {
+        guard ProcessInfo.processInfo.environment["CIVCOACH_LIVE_API_TEST"] == "1" else {
+            throw XCTSkip("Opt in to a small request to the configured API using synthetic game data")
+        }
+        let data = try XCTUnwrap(UserDefaults(suiteName: "local.civ6.coach.desktop")?.data(forKey: "coach.settings.v1"))
+        let config = try JSONDecoder().decode(Settings.self, from: data)
+        let key = try Keychain.load(account: config.keyAccount)
+        let collector = TextCollector()
+        let result = try await AIClient.stream(settings: config, key: key,
+            messages: [["role": "user", "content": "测试场景：第1回合，一座人口1的首都，生产队列为空，一名战士可移动。最多三条行动，每条一句，总计不超过180字。"]],
+            system: teachingPrompt + "\n快速建议：最多三条，每条一句，总计不超过180字，只写行动和简短理由。",
+            budget: .advice) { await collector.append($0) }
+        let text = await collector.value()
+        XCTAssertFalse(text.isEmpty)
+        XCTAssertLessThanOrEqual(text.count, AIOutputBudget.advice.characters)
+        XCTAssertEqual(result, .completed, "The configured model should finish a short advice request within its budget")
+        print("LIVE_API_ADVICE model=\(config.model) characters=\(text.count) result=\(result)")
     }
 }
