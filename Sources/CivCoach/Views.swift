@@ -370,6 +370,7 @@ struct MarkdownText: View {
 }
 
 struct ChatView: View {
+    @State private var historyOpen = false
     @Environment(\.coachTheme) private var theme
     private var palette: ThemePalette { theme.palette }
     @EnvironmentObject var state: AppState
@@ -377,6 +378,7 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
+                Button { historyOpen = true } label: { Label("历史对话", systemImage: "clock.arrow.circlepath") }.buttonStyle(QuietButton())
                 Spacer()
                 Button("导出") { state.exportChat() }.buttonStyle(QuietButton()).disabled(state.messages.isEmpty)
                 Button("新对话") { state.archiveAndClear() }.buttonStyle(QuietButton()).disabled(state.generating)
@@ -422,6 +424,7 @@ struct ChatView: View {
                 }.font(.system(size: 9)).foregroundStyle(palette.secondary)
             }.padding(22).background(palette.sidebar.opacity(0.5))
         }
+        .sheet(isPresented: $historyOpen) { ChatHistoryView() }
     }
     private func messageRow(_ message: ChatMessage) -> some View {
         let fromUser = message.role == "user"
