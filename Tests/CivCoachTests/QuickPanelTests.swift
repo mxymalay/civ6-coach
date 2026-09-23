@@ -3,6 +3,18 @@ import AppKit
 @testable import CivCoach
 
 final class QuickPanelTests: XCTestCase {
+    func testHeaderDragDoesNotStealButtonsTextOrResizeEdges() {
+        let bounds = NSRect(x: 0, y: 0, width: 380, height: 400)
+        for transparent in [false, true] {
+            XCTAssertTrue(PanelInteraction.isMoveArea(NSPoint(x: 50, y: 380), bounds: bounds, transparent: transparent))
+            XCTAssertFalse(PanelInteraction.isMoveArea(NSPoint(x: 375, y: 380), bounds: bounds, transparent: transparent))
+            XCTAssertFalse(PanelInteraction.isMoveArea(NSPoint(x: 50, y: 398), bounds: bounds, transparent: transparent))
+            XCTAssertFalse(PanelInteraction.isMoveArea(NSPoint(x: 50, y: 200), bounds: bounds, transparent: transparent))
+            XCTAssertFalse(PanelInteraction.isMoveArea(NSPoint(x: 340, y: 380), bounds: bounds, transparent: transparent))
+        }
+        XCTAssertFalse(PanelInteraction.isMoveArea(NSPoint(x: 290, y: 380), bounds: bounds, transparent: false))
+        XCTAssertTrue(PanelInteraction.isMoveArea(NSPoint(x: 290, y: 380), bounds: bounds, transparent: true))
+    }
     func testBothModesKeepIndependentSizesAndPinAcrossRestart() throws {
         var value = PanelPreferences()
         value.pinned = true

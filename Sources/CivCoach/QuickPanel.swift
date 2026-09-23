@@ -61,9 +61,34 @@ struct PanelPreferences: Codable {
     }
 }
 
+enum PanelInteraction {
+    static func isMoveArea(_ point: NSPoint, bounds: NSRect, transparent: Bool) -> Bool {
+        guard bounds.contains(point), PanelResizeGeometry.edges(at: point, in: bounds).isEmpty else { return false }
+        let reservedControls: CGFloat = transparent ? 66 : 112
+        return point.y >= bounds.maxY - 40 && point.x < bounds.maxX - reservedControls
+    }
+}
+
 private final class CoachPanel: NSPanel {
+    var transparentMode = false
+    var overlayMenu: (() -> NSMenu)?
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    override func sendEvent(_ event: NSEvent) {
+        if transparentMode,
+           event.type == .rightMouseDown || (event.type == .leftMouseDown && event.modifierFlags.contains(.control)),
+           let contentView, let menu = overlayMenu?() {
+            NSMenu.popUpContextMenu(menu, with: event, for: contentView)
+            return
+        }
+        if event.type == .leftMouseDown,
+           PanelInteraction.isMoveArea(event.locationInWindow,
+               bounds: NSRect(origin: .zero, size: frame.size), transparent: transparentMode) {
+            performDrag(with: event)
+            return
+        }
+        super.sendEvent(event)
+    }
 }
 
 @MainActor final class QuickPanelController: NSObject, ObservableObject, NSWindowDelegate {
@@ -100,7 +125,8 @@ private final class CoachPanel: NSPanel {
         window.identifier = NSUserInterfaceItemIdentifier("coach-quick-panel")
         window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] { window.standardWindowButton(button)?.isHidden = true }
-        window.isMovableByWindowBackground = true
+        window.isMovableByWindowBackground = false
+        window.overlayMenu = { [weak self] in self?.makeOverlayMenu() ?? NSMenu() }
         window.hidesOnDeactivate = false; window.isReleasedWhenClosed = false
         window.isFloatingPanel = true; window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -145,6 +171,7 @@ private final class CoachPanel: NSPanel {
         changingPresentation = true
         defer { changingPresentation = false }
         let appearance = preferences.presentation
+        (panel as? CoachPanel)?.transparentMode = appearance.transparent
         let topLeft = NSPoint(x: panel.frame.minX, y: panel.frame.maxY)
         let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
         // Both layouts own their compact headers; reserve no native title-bar space.
@@ -161,6 +188,38 @@ private final class CoachPanel: NSPanel {
         panel.invalidateShadow()
     }
     func closePanel() { panel?.orderOut(nil) }
+    var overlayActionTitle: String {
+        guard let state else { return "生成建议" }
+        if state.generating { return "停止生成" }
+        if !state.enabled { return "开启陪练" }
+        if !state.apiConfigured { return "配置 AI" }
+        return "生成建议"
+    }
+    @objc func performOverlayAction() {
+        guard let state else { return }
+        if state.generating { state.stopGeneration() }
+        else if !state.enabled { state.setEnabled(true) }
+        else if !state.apiConfigured { showMain(settings: true) }
+        else { state.askAdvice() }
+    }
+    @objc private func exitOverlay() {
+        if preferences.transparent { toggleOverlay() }
+    }
+    func makeOverlayMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let generate = NSMenuItem(title: state?.generating == true ? "停止生成" : "生成建议",
+                                  action: #selector(performOverlayAction), keyEquivalent: "")
+        generate.target = self
+        generate.isEnabled = state?.generating == true || (state?.enabled == true && state?.apiConfigured == true)
+        generate.toolTip = generate.isEnabled ? nil : "请先开启陪练并配置 AI"
+        menu.addItem(generate)
+        menu.addItem(.separator())
+        let exit = NSMenuItem(title: "退出透明", action: #selector(exitOverlay), keyEquivalent: "")
+        exit.target = self
+        menu.addItem(exit)
+        return menu
+    }
     func showMain(settings: Bool = false, chat: Bool = false) {
         if chat { state?.selectedTab = "和老师聊聊" }
         openMain?(); NSApp.activate(ignoringOtherApps: true)

@@ -10,12 +10,12 @@ struct GameOverlayView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 2) {
-                OverlayDragHandle().frame(maxWidth: .infinity).frame(height: 24)
+                Color.white.opacity(0.001).frame(maxWidth: .infinity).frame(height: 24)
                     .help("拖动顶部移动叠加层；拖动边框调整大小")
-                Button(action: quickAction) {
+                Button { quickPanel.performOverlayAction() } label: {
                     Image(systemName: state.generating ? "stop.fill" : "sparkles")
                         .font(.system(size: 11)).frame(width: 24, height: 24).contentShape(Rectangle())
-                }.help(actionTitle).accessibilityLabel(actionTitle).accessibilityIdentifier("overlay-quick-advice")
+                }.help(quickPanel.overlayActionTitle).accessibilityLabel(quickPanel.overlayActionTitle).accessibilityIdentifier("overlay-quick-advice")
                 Button { quickPanel.toggleOverlay() } label: {
                     Image(systemName: "rectangle.fill").font(.system(size: 11))
                         .frame(width: 24, height: 24).contentShape(Rectangle())
@@ -48,32 +48,12 @@ struct GameOverlayView: View {
             .foregroundStyle(.white).tint(.white)
             .shadow(color: .black, radius: 1, x: 0, y: 1)
             .shadow(color: .black.opacity(0.85), radius: 3)
-            .background(Color.clear)
+            // An almost invisible event surface makes blank pixels right-clickable.
+            .background(Color.white.opacity(0.001))
             .overlay {
                 RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(hovering ? 0.38 : 0.18),
                     style: StrokeStyle(lineWidth: 0.75, dash: [4, 4])).padding(3).allowsHitTesting(false)
             }
             .onHover { hovering = $0 }
     }
-    private var actionTitle: String {
-        if state.generating { return "停止生成" }
-        if !state.enabled { return "开启陪练" }
-        if !state.apiConfigured { return "配置 AI" }
-        return "快速建议"
-    }
-    private func quickAction() {
-        if state.generating { state.stopGeneration() }
-        else if !state.enabled { state.setEnabled(true) }
-        else if !state.apiConfigured { quickPanel.showMain(settings: true) }
-        else { state.askAdvice() }
-    }
-}
-
-private struct OverlayDragHandle: NSViewRepresentable {
-    final class DragView: NSView {
-        override var mouseDownCanMoveWindow: Bool { true }
-        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
-    }
-    func makeNSView(context: Context) -> NSView { DragView() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
 }
