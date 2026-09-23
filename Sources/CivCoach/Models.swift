@@ -81,6 +81,7 @@ enum APIStyle: String, Codable, CaseIterable {
 }
 struct Settings: Codable, Equatable {
     var theme: AppTheme = .forest
+    var appearance: AppAppearance = .system
     var endpoint = "https://api.openai.com/v1"
     var model = ""
     var style: APIStyle = .chat
@@ -91,11 +92,14 @@ struct Settings: Codable, Equatable {
     var goal = "先学会基础运营"
     init() {}
     enum CodingKeys: String, CodingKey {
-        case theme, endpoint, model, style, pollSeconds, alwaysOnTop, rememberChat, includeMap, goal
+        case theme, appearance, endpoint, model, style, pollSeconds, alwaysOnTop, rememberChat, includeMap, goal
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        theme = (try? c.decodeIfPresent(AppTheme.self, forKey: .theme)) ?? .forest
+        let oldTheme = (try? c.decodeIfPresent(AppTheme.self, forKey: .theme)) ?? nil
+        theme = oldTheme ?? .forest
+        appearance = (try? c.decodeIfPresent(AppAppearance.self, forKey: .appearance))
+            ?? (oldTheme == nil ? .system : (oldTheme == .white ? .light : .dark))
         endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? "https://api.openai.com/v1"
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
         style = try c.decodeIfPresent(APIStyle.self, forKey: .style) ?? .chat

@@ -243,12 +243,19 @@ private final class CoachPanel: NSPanel {
 private struct QuickPanelRoot: View {
     @EnvironmentObject var state: AppState
     @EnvironmentObject var quickPanel: QuickPanelController
+    @Environment(\.colorScheme) private var systemColorScheme
+    private var appearance: AppAppearance {
+        quickPanel.preferences.transparent ? .dark : state.settings.appearance
+    }
+    private var themeStyle: AppThemeStyle {
+        AppThemeStyle(accent: state.settings.theme, appearance: appearance, systemColorScheme: systemColorScheme)
+    }
     var body: some View {
         Group {
             if quickPanel.preferences.transparent { GameOverlayView() }
             else { MenuContent() }
-        }.environment(\.coachTheme, state.settings.theme)
-         .preferredColorScheme(quickPanel.preferences.transparent ? .dark : state.settings.theme.colorScheme)
+        }.environment(\.coachTheme, themeStyle)
+         .preferredColorScheme(appearance.preferredColorScheme)
          .overlay { PanelResizeBorder() }
     }
 }

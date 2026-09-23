@@ -7,13 +7,18 @@ private enum SettingsPage: String, CaseIterable {
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) var dismiss
+    @Environment(\.coachTheme) private var inheritedTheme
     @State private var draft = Settings()
     @State private var page = SettingsPage.api
     @State private var key = ""
     @State private var localError: String?
     @State private var initialEndpoint = ""
     @State private var initialKey = ""
-    private var palette: ThemePalette { draft.theme.palette }
+    private var themeStyle: AppThemeStyle {
+        AppThemeStyle(accent: draft.theme, appearance: draft.appearance, systemColorScheme: inheritedTheme.systemColorScheme)
+    }
+    private var previewScheme: ColorScheme { draft.appearance.resolve(system: inheritedTheme.systemColorScheme) }
+    private var palette: ThemePalette { themeStyle.palette }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -48,7 +53,7 @@ struct SettingsView: View {
                 }.buttonStyle(PrimaryButton()).disabled(state.testing).accessibilityIdentifier("save-settings")
             }
         }.padding(28).frame(width: 620, height: 570).background(palette.background).foregroundStyle(palette.primary)
-        .environment(\.coachTheme, draft.theme).preferredColorScheme(draft.theme.colorScheme)
+        .environment(\.coachTheme, themeStyle).preferredColorScheme(draft.appearance.preferredColorScheme)
         .onAppear {
             draft = state.settings; initialEndpoint = draft.endpoint; state.testResult = nil
             do { key = try Keychain.load(account: draft.keyAccount); initialKey = key }
@@ -76,21 +81,27 @@ struct SettingsView: View {
     }
     private var appearancePage: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("界面主题").font(.system(size: 15, weight: .semibold))
+            Text("强调色").font(.system(size: 15, weight: .semibold))
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(AppTheme.allCases, id: \.self) { theme in
                     Button { draft.theme = theme } label: {
+                        let swatch = theme.palette(for: previewScheme)
                         HStack {
-                            Circle().fill(theme.palette.mint).frame(width: 18, height: 18)
-                            Text(theme.title).foregroundStyle(theme.palette.primary)
+                            Circle().fill(swatch.mint).frame(width: 18, height: 18)
+                            Text(theme.title).foregroundStyle(swatch.primary)
                             Spacer()
-                            if draft.theme == theme { Image(systemName: "checkmark.circle.fill").foregroundStyle(theme.palette.mint) }
-                        }.padding(14).background(theme.palette.background, in: RoundedRectangle(cornerRadius: 10))
+                            if draft.theme == theme { Image(systemName: "checkmark.circle.fill").foregroundStyle(swatch.mint) }
+                        }.padding(14).background(swatch.background, in: RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(draft.theme == theme ? palette.mint : palette.line, lineWidth: 1.5))
                     }.buttonStyle(.plain).accessibilityLabel(theme.title).accessibilityValue(draft.theme == theme ? "已选择" : "未选择")
                 }
             }
-            Text("当前设置页即时预览；保存后同步主窗口与快捷小窗。").font(.system(size: 11)).foregroundStyle(palette.secondary)
+            Text("外观").font(.system(size: 15, weight: .semibold))
+            Picker("外观", selection: $draft.appearance) {
+                ForEach(AppAppearance.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
+            }.pickerStyle(.segmented).accessibilityIdentifier("appearance-mode")
+            Text("强调色只改变界面点缀色；深浅外观可独立选择，也可跟随 macOS 系统设置。保存后同步主窗口与快捷小窗。")
+                .font(.system(size: 11)).foregroundStyle(palette.secondary)
             Toggle("主窗口保持在最前面", isOn: $draft.alwaysOnTop).toggleStyle(.switch).controlSize(.small)
             Text("图钉只控制普通卡片固定；虚线矩形图标进入透明游戏叠加层并自动置顶。透明层只保留建议与小图标，实心矩形图标退出透明。拖动顶部移动、拖动四边或四角缩放，两种模式分别记住尺寸。").font(.system(size: 11)).foregroundStyle(palette.secondary)
         }.font(.system(size: 12))
