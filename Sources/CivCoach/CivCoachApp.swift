@@ -103,6 +103,6 @@ struct MenuContent: View {
                         .buttonStyle(CompactActionButton(prominent: true))
                 }
             }.buttonStyle(CompactActionButton()).font(.system(size: 12))
-        }.padding(12).frame(minWidth: 320, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity).background(palette.background).foregroundStyle(palette.primary).preferredColorScheme(theme.colorScheme)
+        }.padding(12).frame(minWidth: 320, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity).background(palette.background).foregroundStyle(palette.primary)
     }
 }

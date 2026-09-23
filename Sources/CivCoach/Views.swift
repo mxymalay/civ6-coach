@@ -42,6 +42,8 @@ struct APIProfileMenu: View {
     let profiles: [APIProfile]
     let selectedID: UUID
     let onSelect: (UUID) -> Void
+    var compact = false
+    private var selected: APIProfile? { profiles.first { $0.id == selectedID } }
     var body: some View {
         Menu {
             ForEach(profiles) { profile in
@@ -53,13 +55,13 @@ struct APIProfileMenu: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: "server.rack").foregroundStyle(theme.palette.mint)
-                Text(profiles.first { $0.id == selectedID }?.displayName ?? "API").lineLimit(1)
+                Text((selected?.displayName ?? "API") + (compact && !(selected?.model.isEmpty ?? true) ? " · " + (selected?.model ?? "") : "")).lineLimit(1)
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
             }.font(.system(size: 11, weight: .medium)).foregroundStyle(theme.palette.primary)
-                .padding(.horizontal, 10).padding(.vertical, 9)
-                .background(theme.palette.sidebar, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.palette.line))
+                .padding(.horizontal, compact ? 0 : 10).padding(.vertical, compact ? 3 : 9)
+                .background(compact ? Color.clear : theme.palette.sidebar, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(compact ? Color.clear : theme.palette.line))
         }.menuStyle(.borderlessButton).menuIndicator(.hidden)
             .help("切换 API 配置").accessibilityLabel("API 配置")
     }
@@ -203,8 +205,6 @@ struct MainView: View {
             }
             Spacer()
             if state.generating { ProgressView().controlSize(.small); Text(state.phase).font(.system(size: 11)).foregroundStyle(palette.secondary) }
-            APIProfileMenu(profiles: state.settings.apiProfiles, selectedID: state.settings.selectedAPIID, onSelect: state.selectAPIProfile)
-                .frame(width: 150).disabled(state.generating || state.testing)
             Button { state.refresh() } label: { Label(state.refreshing ? "读取中" : "刷新局势", systemImage: "arrow.clockwise") }
                 .buttonStyle(QuietButton()).disabled(state.refreshing || state.generating).keyboardShortcut("r", modifiers: .command)
             Button { state.toggleMainPin() } label: {
@@ -414,7 +414,12 @@ struct ChatView: View {
                             .keyboardShortcut(.return, modifiers: .command).help("发送 ⌘↩").accessibilityIdentifier("send-chat")
                     }
                 }
-                HStack { Text(state.apiConfigured ? state.modelLabel : "尚未配置 AI 模型"); Spacer(); Text("⌘ ↩ 发送 · 每次发送前刷新局势") }.font(.system(size: 9)).foregroundStyle(palette.secondary)
+                HStack {
+                    APIProfileMenu(profiles: state.settings.apiProfiles, selectedID: state.settings.selectedAPIID, onSelect: state.selectAPIProfile, compact: true)
+                        .frame(maxWidth: 260).disabled(state.generating || state.testing)
+                    Spacer()
+                    Text("⌘ ↩ 发送 · 每次发送前刷新局势")
+                }.font(.system(size: 9)).foregroundStyle(palette.secondary)
             }.padding(22).background(palette.sidebar.opacity(0.5))
         }
     }

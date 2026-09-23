@@ -253,7 +253,9 @@ private struct QuickPanelRoot: View {
             if quickPanel.preferences.transparent { GameOverlayView() }
             else { MenuContent() }
         }.environment(\.coachTheme, themeStyle)
-         .preferredColorScheme(appearance.preferredColorScheme)
+         // Scope overlay contrast to content, never feed a window-level dark
+         // preference back into the system appearance read above.
+         .environment(\.colorScheme, themeStyle.colorScheme)
          .overlay { PanelResizeBorder() }
     }
 }
