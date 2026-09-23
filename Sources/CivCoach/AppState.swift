@@ -144,7 +144,7 @@ enum APITestResult: Equatable {
                 let current = await self.readGame()
                 try Task.checkCancellation()
                 guard id == self.runID else { return }
-                if isAdvice && current == nil { throw CoachError.message(self.connectionError ?? "没有实时局势，暂时无法分析这一回合。") }
+                if isAdvice && current == nil { throw CoachError.message("尚未读取到对局，进入地图后再生成建议。") }
                 let history = self.messages.dropFirst(self.restoredHistoryCount).suffix(16).filter { !$0.interrupted }.map { ["role": $0.role, "content": String($0.text.prefix(6000))] }
                 var chat = isAdvice ? [] : history
                 if !isAdvice && self.adviceComplete && !self.advice.isEmpty {

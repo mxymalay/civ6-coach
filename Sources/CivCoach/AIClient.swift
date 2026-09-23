@@ -121,7 +121,7 @@ enum AIClient {
             for try await line in bytes.lines {
                 try Task.checkCancellation()
                 chars += line.utf8.count
-                guard chars < 2_000_000 else { throw CoachError.message("回复过长，已停止接收。") }
+                guard chars < 2_000_000 else { throw CoachError.message("AI 响应流超出安全上限，已停止接收。") }
                 // AsyncBytes.lines omits empty lines on macOS. Flush complete JSON
                 // values rather than relying on the SSE blank-line delimiter.
                 if line.hasPrefix("data:") {

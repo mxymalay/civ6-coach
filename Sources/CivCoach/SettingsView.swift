@@ -25,10 +25,7 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("陪练设置").font(.system(size: 23, weight: .medium, design: .serif))
-                    Text("连接 AI，调整外观，选择陪练方式").font(.system(size: 12)).foregroundStyle(palette.secondary)
-                }
+                Text("陪练设置").font(.system(size: 23, weight: .medium, design: .serif))
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 20)).foregroundStyle(palette.secondary) }.buttonStyle(.plain)
             }
@@ -45,7 +42,6 @@ struct SettingsView: View {
             }.background(palette.card, in: RoundedRectangle(cornerRadius: 14))
             if let localError { Text(localError).font(.system(size: 11)).foregroundStyle(palette.gold) }
             HStack {
-                Text("保存将应用所有分页的修改。").font(.system(size: 10)).foregroundStyle(palette.secondary)
                 Spacer()
                 Button("取消") { dismiss() }.buttonStyle(QuietButton())
                 Button("保存设置") {
@@ -69,7 +65,6 @@ struct SettingsView: View {
     private var apiPage: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("自定义 API").font(.system(size: 15, weight: .semibold))
-            Text("支持 OpenAI 兼容接口与本机模型。").foregroundStyle(palette.secondary)
             HStack(spacing: 12) {
                 Text("接口类型").frame(width: 76, alignment: .leading)
                 CoachChoiceBar(selection: $draft.style, choices: APIStyle.allCases, title: { $0.rawValue })
@@ -123,9 +118,6 @@ struct SettingsView: View {
             Text("外观").font(.system(size: 15, weight: .semibold))
             CoachChoiceBar(selection: $draft.appearance, choices: AppAppearance.allCases, title: { $0.title })
                 .accessibilityIdentifier("appearance-mode")
-            Text("强调色只改变界面点缀色；深浅外观可独立选择，也可跟随 macOS 系统设置。保存后同步主窗口与快捷小窗。")
-                .font(.system(size: 11)).foregroundStyle(palette.secondary)
-            Text("主窗口右上角图钉可单独固定主窗口；快捷卡片也有自己的图钉。虚线矩形图标进入透明游戏叠加层并自动置顶。透明层只保留建议与小图标，实心矩形图标退出透明。拖动顶部移动、拖动四边或四角缩放，两种模式分别记住尺寸。").font(.system(size: 11)).foregroundStyle(palette.secondary)
         }.font(.system(size: 12))
     }
     private var coachingPage: some View {

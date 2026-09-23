@@ -197,11 +197,6 @@ struct MainView: View {
                         }.buttonStyle(.plain).help("刷新局势").disabled(state.refreshing || state.generating)
                     }.padding(.bottom, 2)
 
-                    if let error = state.connectionError {
-                        Label(error, systemImage: "exclamationmark.circle").font(.system(size: 11))
-                            .foregroundStyle(palette.gold).lineLimit(2)
-                    }
-
                     HStack(spacing: 9) {
                         compactMetric("金币", value: snap.economy.display("gold"), detail: snap.economy.display("gold_net_per_turn") + "/回合", icon: "circle.circle", color: palette.gold)
                         compactMetric("科研", value: snap.economy.display("science_per_turn"), detail: "每回合", icon: "flask", color: palette.mint)
@@ -255,9 +250,6 @@ struct MainView: View {
                         Spacer()
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                         .background(palette.card, in: RoundedRectangle(cornerRadius: 11))
-                    if let error = state.connectionError {
-                        Text(error).font(.system(size: 11)).foregroundStyle(palette.secondary).lineLimit(2)
-                    }
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -342,7 +334,6 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("边玩边问，把每个选择想明白。").font(.system(size: 11)).foregroundStyle(palette.secondary)
                 Spacer()
                 Button("导出") { state.exportChat() }.buttonStyle(QuietButton()).disabled(state.messages.isEmpty)
                 Button("新对话") { state.archiveAndClear() }.buttonStyle(QuietButton()).disabled(state.generating)
@@ -354,26 +345,13 @@ struct ChatView: View {
                             VStack(alignment: .leading, spacing: 18) {
                                 Image(systemName: "bubble.left.and.text.bubble.right").font(.system(size: 39, weight: .light)).foregroundStyle(palette.mint)
                                 Text("你想先弄懂什么？").font(.system(size: 25, weight: .medium, design: .serif))
-                                Text("老师会结合刚读取的局势回答，并记住这段对话。\n没有连上游戏时，也可以聊通用玩法。").font(.system(size: 12)).foregroundStyle(palette.secondary).lineSpacing(6)
                                 ForEach(["我现在最应该做什么？", "首都下一步造什么？解释一下原因。", "怎么判断第二座城市建在哪里？"], id: \.self) { text in
                                     Button { state.draft = text } label: { HStack { Text(text); Spacer(); Image(systemName: "arrow.up.left") } }.buttonStyle(QuietButton())
                                 }
                             }.padding(.vertical, 30).frame(maxWidth: 470, alignment: .leading)
                         }
                         ForEach(state.messages) { msg in
-                            HStack(alignment: .top, spacing: 13) {
-                                Image(systemName: msg.role == "user" ? "person.crop.circle" : "sparkles").font(.system(size: 17)).foregroundStyle(msg.role == "user" ? palette.secondary : palette.mint).frame(width: 29, height: 29)
-                                VStack(alignment: .leading, spacing: 9) {
-                                    HStack {
-                                        Text(msg.role == "user" ? "你" : "文明陪练").font(.system(size: 11, weight: .semibold)).foregroundStyle(palette.secondary)
-                                        if msg.interrupted { Text("未完成").font(.system(size: 9)).foregroundStyle(palette.gold) }
-                                        Spacer()
-                                        Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(msg.text, forType: .string) } label: { Image(systemName: "doc.on.doc").font(.system(size: 10)).foregroundStyle(palette.secondary) }.buttonStyle(.plain).help("复制消息")
-                                    }
-                                    if msg.text.isEmpty { Text(state.phase).font(.system(size: 12)).foregroundStyle(palette.secondary) }
-                                    else { MarkdownText(text: msg.text) }
-                                }.padding(15).frame(maxWidth: .infinity, alignment: .leading).background(msg.role == "user" ? palette.primary.opacity(0.035) : palette.card, in: RoundedRectangle(cornerRadius: 13))
-                            }.id(msg.id)
+                            messageRow(msg).id(msg.id)
                         }
                         Color.clear.frame(height: 1).id("bottom")
                     }.padding(.horizontal, 26).padding(.vertical, 16)
@@ -396,6 +374,47 @@ struct ChatView: View {
                 HStack { Text(state.apiConfigured ? state.modelLabel : "尚未配置 AI 模型"); Spacer(); Text("⌘ ↩ 发送 · 每次发送前刷新局势") }.font(.system(size: 9)).foregroundStyle(palette.secondary)
             }.padding(22).background(palette.sidebar.opacity(0.5))
         }
+    }
+    private func messageRow(_ message: ChatMessage) -> some View {
+        let fromUser = message.role == "user"
+        return HStack(alignment: .top, spacing: 10) {
+            if fromUser { Spacer(minLength: 40) }
+            else { messageAvatar(fromUser: false) }
+            messageBubble(message, fromUser: fromUser)
+                .frame(maxWidth: fromUser ? 500 : 600, alignment: .leading)
+            if fromUser { messageAvatar(fromUser: true) }
+            else { Spacer(minLength: 40) }
+        }
+        .frame(maxWidth: .infinity)
+    }
+    private func messageAvatar(fromUser: Bool) -> some View {
+        Image(systemName: fromUser ? "person.crop.circle.fill" : "sparkles")
+            .font(.system(size: 18))
+            .foregroundStyle(fromUser ? palette.mint : palette.secondary)
+            .frame(width: 28, height: 28)
+            .padding(.top, 3)
+            .accessibilityHidden(true)
+    }
+    private func messageBubble(_ message: ChatMessage, fromUser: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(fromUser ? "你" : "文明陪练")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.secondary)
+                if message.interrupted { Text("未完成").font(.system(size: 9)).foregroundStyle(palette.gold) }
+                Spacer(minLength: 8)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(message.text, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc").font(.system(size: 10)).foregroundStyle(palette.secondary)
+                }.buttonStyle(.plain).help("复制消息")
+            }
+            if message.text.isEmpty { Text(state.phase).font(.system(size: 12)).foregroundStyle(palette.secondary) }
+            else { MarkdownText(text: message.text) }
+        }
+        .padding(15)
+        .background(fromUser ? palette.mint.opacity(0.12) : palette.card, in: RoundedRectangle(cornerRadius: 13))
     }
 }
 

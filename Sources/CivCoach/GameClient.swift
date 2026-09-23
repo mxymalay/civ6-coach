@@ -49,7 +49,7 @@ actor GameClient {
                 let result = poll(&p, 1, 100)
                 if result > 0 {
                     if p.revents & event != 0 { return }
-                    if p.revents & Int16(POLLERR | POLLHUP | POLLNVAL) != 0 { throw CoachError.message("游戏连接已断开，请重新载入地图。") }
+                    if p.revents & Int16(POLLERR | POLLHUP | POLLNVAL) != 0 { throw CoachError.message("游戏连接中断。") }
                 } else if result < 0 && errno != EINTR { throw CoachError.message("游戏连接不可用。") }
             }
         }

@@ -23,18 +23,29 @@ struct GameOverlayView: View {
             }.buttonStyle(.plain).opacity(hovering ? 0.9 : 0.42)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
-                    if let warning = state.error ?? state.connectionError {
-                        Text(warning).font(.system(size: 11)).foregroundStyle(Color(red: 1, green: 0.87, blue: 0.53))
+                    if let warning = state.error {
+                        Label("详情见主窗口", systemImage: "exclamationmark.circle")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 1, green: 0.87, blue: 0.53))
+                            .lineLimit(1)
+                            .help(warning)
                     }
                     if !state.advice.isEmpty {
                         Text("第 \(state.adviceTurn ?? 0) 回合" + (state.adviceTurn != state.snapshot?.turn ? " · 旧建议" : "") + (state.adviceComplete ? "" : " · 未完成"))
                             .font(.system(size: 10)).opacity(0.65)
                         Text((try? AttributedString(markdown: state.advice, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(state.advice))
-                            .font(.system(size: 14, weight: .medium)).lineSpacing(4).textSelection(.enabled)
+                            .font(.system(size: 14, weight: .medium))
+                            .lineSpacing(4)
+                            .lineLimit(5)
+                            .truncationMode(.tail)
+                            .textSelection(.enabled)
                     } else if let snap = state.snapshot {
-                        ForEach(quickTips(snap).prefix(3)) { tip in
-                            Text(tip.title).font(.system(size: 13, weight: .semibold))
-                            Text(tip.detail).font(.system(size: 12)).lineSpacing(3)
+                        ForEach(quickTips(snap).prefix(2)) { tip in
+                            Text(tip.title)
+                                .font(.system(size: 13, weight: .semibold))
+                                .lineLimit(1)
+                                .help(tip.detail)
+                                .accessibilityLabel(tip.title + "。" + tip.detail)
                         }
                     } else {
                         Text("载入地图后，点 ✧ 获取建议。").font(.system(size: 12))

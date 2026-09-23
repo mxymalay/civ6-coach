@@ -61,7 +61,7 @@ struct MenuContent: View {
             if let snap = state.snapshot {
                 HStack { Text("第 \(snap.turn) 回合").fontWeight(.semibold); Spacer(); Text("\(snap.cities.count) 城 · \(snap.units.count) 单位") }.font(.system(size: 12))
             }
-            if let message = state.error ?? state.connectionError { Text(message).font(.system(size: 11)).foregroundStyle(palette.gold).lineLimit(2).help(message) }
+            if let message = state.error { Text(message).font(.system(size: 11)).foregroundStyle(palette.gold).lineLimit(2).help(message) }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if let from = state.turnChanges.fromTurn, let to = state.turnChanges.toTurn, !state.turnChanges.tips.isEmpty {
