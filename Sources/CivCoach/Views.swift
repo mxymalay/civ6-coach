@@ -63,47 +63,35 @@ struct MainView: View {
                 Image(systemName: "globe.asia.australia.fill").font(.system(size: 29, weight: .light)).foregroundStyle(palette.gold)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("文明 VI 陪练").font(.system(size: 17, weight: .semibold))
-                    Text("每一步，都有思路").font(.system(size: 10)).tracking(2).foregroundStyle(palette.secondary)
                 }
-            }.padding(.top, 28).padding(.bottom, 30)
+            }.padding(.top, 25).padding(.bottom, 24)
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("陪练开关").font(.system(size: 13, weight: .medium))
-                    Text(state.enabled ? "正在留意你的局势" : "按需开启，随时暂停").font(.system(size: 10)).foregroundStyle(palette.secondary)
+                    Text("陪练").font(.system(size: 13, weight: .medium))
                 }
                 Spacer()
                 Toggle("开启陪练", isOn: Binding(get: { state.enabled }, set: { state.setEnabled($0) })).labelsHidden().toggleStyle(.switch).tint(palette.mint).controlSize(.small)
                     .accessibilityIdentifier("coach-toggle")
-            }.padding(14).background(palette.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+            }.padding(12).background(palette.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
             VStack(spacing: 7) {
                 navItem("局势与建议", icon: "square.grid.2x2")
                 navItem("和老师聊聊", icon: "bubble.left.and.bubble.right")
-            }.padding(.top, 26)
-            Rectangle().fill(palette.line).frame(height: 1).padding(.vertical, 23)
-            Text("当前对局").font(.system(size: 10, weight: .semibold)).foregroundStyle(palette.secondary).tracking(2)
+            }.padding(.top, 18)
+            Rectangle().fill(palette.line).frame(height: 1).padding(.vertical, 16)
+            Text("当前对局").font(.system(size: 10, weight: .semibold)).foregroundStyle(palette.secondary)
             if let snap = state.snapshot {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(snap.meta.text("civilization")).font(.system(size: 23, weight: .medium, design: .serif)).foregroundStyle(palette.gold)
-                    Text(snap.meta.text("leader") + " · 第 \(snap.turn) 回合").font(.system(size: 12)).foregroundStyle(palette.secondary)
-                    HStack { Label("\(snap.cities.count) 座城市", systemImage: "building.2"); Spacer(); Label("\(snap.units.count) 支部队", systemImage: "flag") }.font(.system(size: 10)).foregroundStyle(palette.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(snap.meta.text("civilization")).font(.system(size: 18, weight: .medium, design: .serif)).foregroundStyle(palette.gold)
+                    Text("第 \(snap.turn) 回合 · \(snap.cities.count) 城").font(.system(size: 11)).foregroundStyle(palette.secondary)
                 }.padding(.top, 16)
             } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    Image(systemName: "map").font(.system(size: 25, weight: .ultraLight)).foregroundStyle(palette.secondary)
-                    Text("等待你的文明").font(.system(size: 14))
-                    Text("进入单人地图，再开启陪练。\n无需截图，直接读取局势。").font(.system(size: 11)).foregroundStyle(palette.secondary).lineSpacing(4)
-                }.padding(.top, 16)
+                Text("未连接").font(.system(size: 11)).foregroundStyle(palette.secondary).padding(.top, 16)
             }
             Spacer(minLength: 18)
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 6) {
-                    Circle().fill(state.live ? palette.mint : palette.secondary).frame(width: 6, height: 6)
-                    Text(state.status).font(.system(size: 10)).foregroundStyle(palette.secondary)
-                }
                 Button { state.settingsOpen = true } label: {
                     HStack { Image(systemName: "slider.horizontal.3"); Text("AI 与偏好设置"); Spacer(); Image(systemName: "chevron.right").font(.system(size: 9)) }
                 }.buttonStyle(QuietButton()).accessibilityIdentifier("settings-button")
-                Text("只读你的局势 · 决定由你来做").font(.system(size: 9)).foregroundStyle(palette.secondary.opacity(0.7))
             }.padding(.bottom, 22)
         }.padding(.horizontal, 19).frame(maxHeight: .infinity).background(palette.sidebar)
     }
@@ -122,7 +110,7 @@ struct MainView: View {
                 if let snap = state.snapshot {
                     Text("第 \(snap.turn) 回合快照 · \(snap.capturedAt.formatted(date: .omitted, time: .standard))" + (state.live ? " 更新" : " · 非实时"))
                         .font(.system(size: 10)).foregroundStyle(palette.secondary)
-                } else { Text("你的回合，你的节奏").font(.system(size: 10)).foregroundStyle(palette.secondary) }
+                } else { Text(state.status).font(.system(size: 10)).foregroundStyle(palette.secondary) }
             }
             Spacer()
             if state.generating { ProgressView().controlSize(.small); Text(state.phase).font(.system(size: 11)).foregroundStyle(palette.secondary) }
@@ -133,121 +121,151 @@ struct MainView: View {
     }
     private var dashboard: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text("下一步，走得更从容。").font(.system(size: 27, weight: .medium, design: .serif))
-                        Text("看清局势，理解取舍，再做决定。").font(.system(size: 12)).foregroundStyle(palette.secondary)
-                    }
-                    Spacer()
-                    Button { state.askAdvice() } label: { Label("一键 AI 建议", systemImage: "sparkles") }
-                        .buttonStyle(PrimaryButton()).disabled(!state.enabled || state.generating)
-                        .accessibilityIdentifier("advice-button")
-                }.padding(.top, 6)
-                if !state.enabled {
-                    infoBanner("陪练已暂停", detail: "打开左侧开关后自动读取游戏。暂停会停止读取与 AI 请求。", icon: "pause.circle")
-                } else if let err = state.connectionError {
-                    infoBanner("还没连上游戏", detail: err, icon: "link")
-                }
-                if !state.apiConfigured {
-                    HStack(spacing: 12) {
-                        Image(systemName: "key.horizontal").foregroundStyle(palette.gold)
-                        VStack(alignment: .leading, spacing: 4) { Text("接入你的 AI").font(.system(size: 12, weight: .medium)); Text("配置 API 后解锁分析与对话；基础提醒无需 AI。").font(.system(size: 11)).foregroundStyle(palette.secondary) }
-                        Spacer()
-                        Button("去配置") { state.settingsOpen = true }.buttonStyle(QuietButton())
-                    }.padding(16).background(palette.gold.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
-                }
+            VStack(alignment: .leading, spacing: 14) {
                 if let snap = state.snapshot {
-                    if let from = state.turnChanges.fromTurn, let to = state.turnChanges.toTurn {
-                        Card {
-                          VStack(alignment: .leading, spacing: 8) {
-                            Text("回合变化 · \(from) → \(to)").font(.system(size: 14, weight: .semibold))
-                            Text("本地比较 · 不调用 AI" + (to - from > 1 ? " · 跨回合汇总" : "")).font(.system(size: 10)).foregroundStyle(palette.secondary)
-                            if state.turnChanges.tips.isEmpty { Text("已采集字段中没有新的重点变化；不代表没有其他事件。").font(.system(size: 11)).foregroundStyle(palette.secondary) }
-                            ForEach(state.turnChanges.tips) { tip in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Label(tip.title, systemImage: tip.icon).font(.system(size: 12, weight: .medium)).foregroundStyle(tip.urgent ? palette.gold : palette.primary)
-                                    Text(tip.detail).font(.system(size: 11)).foregroundStyle(palette.secondary)
-                                }.padding(.top, 8)
-                            }
-                          }
-                        }
-                    }
                     HStack(spacing: 12) {
-                        stat("国库", value: snap.economy.display("gold"), detail: "净收入 " + snap.economy.display("gold_net_per_turn") + "/回合", icon: "circle.circle", color: palette.gold)
-                        stat("科技", value: snap.economy.display("science_per_turn"), detail: "每回合科研产出", icon: "flask", color: .cyan.opacity(0.8))
-                        stat("文化", value: snap.economy.display("culture_per_turn"), detail: "每回合文化产出", icon: "building.columns", color: .purple.opacity(0.85))
-                        stat("信仰", value: snap.economy.display("faith"), detail: "当前信仰储备", icon: "sun.max", color: palette.mint)
-                    }
-                    HStack { Text("先留意这几件事").font(.system(size: 14, weight: .semibold)); Spacer(); Text("本地基础提醒 · 无 API 消耗").font(.system(size: 10)).foregroundStyle(palette.secondary) }
-                    VStack(spacing: 10) {
-                        ForEach(quickTips(snap)) { tip in
-                            HStack(alignment: .top, spacing: 14) {
-                                Image(systemName: tip.icon).font(.system(size: 16)).foregroundStyle(tip.urgent ? palette.gold : palette.mint).frame(width: 34, height: 34).background(palette.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 9))
-                                VStack(alignment: .leading, spacing: 6) { Text(tip.title).font(.system(size: 13, weight: .medium)); Text(tip.detail).font(.system(size: 11)).foregroundStyle(palette.secondary).lineSpacing(3).fixedSize(horizontal: false, vertical: true) }
-                                Spacer()
-                                if tip.urgent { Text("优先").font(.system(size: 9)).foregroundStyle(palette.gold).padding(5).background(palette.gold.opacity(0.09), in: RoundedRectangle(cornerRadius: 5)) }
-                            }.padding(15).background(palette.card, in: RoundedRectangle(cornerRadius: 12))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(snap.meta.text("civilization")).font(.system(size: 19, weight: .semibold, design: .serif))
+                            Text("第 \(snap.turn) 回合 · \(snap.cities.count) 城 · \(snap.units.count) 部队")
+                                .font(.system(size: 11)).foregroundStyle(palette.secondary)
                         }
+                        Spacer()
+                        HStack(spacing: 5) {
+                            Circle().fill(state.live ? palette.mint : palette.secondary).frame(width: 6, height: 6)
+                            Text(state.live ? "实时" : "已暂停").font(.system(size: 10)).foregroundStyle(palette.secondary)
+                        }
+                        Button { state.refresh() } label: {
+                            Image(systemName: state.refreshing ? "hourglass" : "arrow.clockwise").frame(width: 28, height: 28)
+                        }.buttonStyle(.plain).help("刷新局势").disabled(!state.enabled || state.refreshing || state.generating)
+                    }.padding(.bottom, 2)
+
+                    if let error = state.connectionError {
+                        Label(error, systemImage: "exclamationmark.circle").font(.system(size: 11))
+                            .foregroundStyle(palette.gold).lineLimit(2)
                     }
-                    if snap.errors > 0 { Text("有 \(snap.errors) 项数据暂不可用，建议会保留不确定性。").font(.system(size: 11)).foregroundStyle(palette.gold) }
-                } else {
-                    Card {
-                        HStack(spacing: 25) {
-                            Image(systemName: "map.circle").font(.system(size: 65, weight: .ultraLight)).foregroundStyle(palette.mint.opacity(0.55))
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("从这一回合开始").font(.system(size: 20, weight: .medium, design: .serif))
-                                Text("1  进入《文明 VI》的单人地图\n2  开启陪练，读取你的城市与部队\n3  点一下建议，或者直接问老师").font(.system(size: 12)).foregroundStyle(palette.secondary).lineSpacing(10)
+
+                    HStack(spacing: 9) {
+                        compactMetric("金币", value: snap.economy.display("gold"), detail: snap.economy.display("gold_net_per_turn") + "/回合", icon: "circle.circle", color: palette.gold)
+                        compactMetric("科研", value: snap.economy.display("science_per_turn"), detail: "每回合", icon: "flask", color: palette.mint)
+                        compactMetric("文化", value: snap.economy.display("culture_per_turn"), detail: "每回合", icon: "building.columns", color: .purple.opacity(0.85))
+                        compactMetric("信仰", value: snap.economy.display("faith"), detail: "储备", icon: "sun.max", color: palette.secondary)
+                    }
+
+                    if !state.turnChanges.tips.isEmpty {
+                        sectionTitle("回合变化")
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(state.turnChanges.tips.prefix(2)) { tip in
+                                HStack(spacing: 8) {
+                                    Image(systemName: tip.icon).foregroundStyle(tip.urgent ? palette.gold : palette.mint)
+                                    Text(tip.title).lineLimit(1)
+                                    Spacer(minLength: 0)
+                                }.font(.system(size: 11))
                             }
-                            Spacer()
-                        }.padding(.vertical, 22)
+                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(palette.card, in: RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    sectionTitle("提醒")
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(quickTips(snap).prefix(3).enumerated()), id: \.offset) { index, tip in
+                            HStack(alignment: .top, spacing: 9) {
+                                Image(systemName: tip.icon).foregroundStyle(tip.urgent ? palette.gold : palette.mint)
+                                    .frame(width: 17).padding(.top, 1)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(tip.title).font(.system(size: 12, weight: .medium))
+                                    Text(tip.detail).font(.system(size: 10)).foregroundStyle(palette.secondary).lineLimit(2)
+                                }
+                                Spacer(minLength: 0)
+                                if tip.urgent { Text("优先").font(.system(size: 9)).foregroundStyle(palette.gold) }
+                            }.padding(.vertical, 9)
+                            if index < min(quickTips(snap).count, 3) - 1 {
+                                Rectangle().fill(palette.line).frame(height: 1).padding(.leading, 26)
+                            }
+                        }
+                    }.padding(.horizontal, 12).background(palette.card, in: RoundedRectangle(cornerRadius: 10))
+
+                    if snap.errors > 0 {
+                        Text("\(snap.errors) 项数据暂不可用").font(.system(size: 10)).foregroundStyle(palette.gold)
+                    }
+                } else {
+                    HStack(spacing: 13) {
+                        Image(systemName: "map").font(.system(size: 25)).foregroundStyle(palette.mint)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("还没连接对局").font(.system(size: 14, weight: .medium))
+                            Text("进入单人地图并开启陪练").font(.system(size: 11)).foregroundStyle(palette.secondary)
+                        }
+                        Spacer()
+                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(palette.card, in: RoundedRectangle(cornerRadius: 11))
+                    if let error = state.connectionError {
+                        Text(error).font(.system(size: 11)).foregroundStyle(palette.secondary).lineLimit(2)
                     }
                 }
-                Card {
-                    VStack(alignment: .leading, spacing: 15) {
-                        HStack {
-                            Label("老师的建议", systemImage: "sparkles").font(.system(size: 14, weight: .semibold)).foregroundStyle(palette.mint)
-                            Spacer()
-                            if let turn = state.adviceTurn { Text("依据第 \(turn) 回合" + (turn != state.snapshot?.turn ? " · 旧建议" : "") + (!state.adviceComplete && !state.advice.isEmpty ? " · 未完成" : "")).font(.system(size: 10)).foregroundStyle(palette.secondary) }
-                            if !state.advice.isEmpty { Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(state.advice, forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("复制建议") }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("老师建议", systemImage: "sparkles").font(.system(size: 13, weight: .semibold)).foregroundStyle(palette.mint)
+                        Spacer()
+                        if let turn = state.adviceTurn {
+                            Text("第 \(turn) 回合" + (turn != state.snapshot?.turn ? " · 旧" : ""))
+                                .font(.system(size: 10)).foregroundStyle(palette.secondary)
                         }
-                        if state.advice.isEmpty { Text(state.generating && state.selectedTab == "局势与建议" ? state.phase : "让老师结合当前局势，给你一个有理由的下一步。\n建议会逐字出现，也可以随时停止。").font(.system(size: 12)).foregroundStyle(palette.secondary).lineSpacing(6).padding(.vertical, 8) }
-                        else { MarkdownText(text: state.advice) }
-                        HStack {
-                            if state.generating { Button("停止生成") { state.stopGeneration() }.buttonStyle(QuietButton()) }
-                            Spacer()
-                            Button { state.selectedTab = "和老师聊聊"; state.draft = "请解释刚才建议的取舍。" } label: { Label("继续讨论", systemImage: "arrow.up.right") }.buttonStyle(QuietButton())
-                        }
-                    }
-                }
-                if let snap = state.snapshot, !snap.cities.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack { Text("城市速览").font(.system(size: 14, weight: .semibold)); Spacer(); Text("人口 / 住房 · 当前生产").font(.system(size: 10)).foregroundStyle(palette.secondary) }
-                        ForEach(Array(snap.cities.enumerated()), id: \.offset) { _,city in
-                            HStack {
-                                Image(systemName: "building.2.crop.circle").font(.system(size: 24)).foregroundStyle(palette.gold)
-                                Text(city.text("name")).font(.system(size: 12, weight: .medium))
-                                Text(city.display("population") + " / " + city.display("housing")).font(.system(size: 11)).foregroundStyle(palette.secondary)
-                                Spacer()
-                                Text(city.text("production")).font(.system(size: 12))
-                                if let turns = city.int("production_turns"), turns >= 0 { Text("\(turns) 回合").font(.system(size: 10)).foregroundStyle(palette.secondary) }
-                            }.padding(14).background(palette.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 11))
+                        if !state.advice.isEmpty {
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(state.advice, forType: .string)
+                            } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("复制建议")
                         }
                     }
-                }
-                Text("游戏读取仅在本机进行。点击 AI 建议或发送消息时，相关局势会发送到你选择的 AI 服务。").font(.system(size: 10)).foregroundStyle(palette.secondary.opacity(0.75)).fixedSize(horizontal: false, vertical: true)
-            }.padding(28)
+                    if !state.advice.isEmpty {
+                        MarkdownText(text: state.advice)
+                    } else {
+                        Text(advicePlaceholder).font(.system(size: 11)).foregroundStyle(palette.secondary)
+                    }
+                    HStack {
+                        Spacer()
+                        Button(action: dashboardAdviceAction) {
+                            if state.generating { Label("停止", systemImage: "stop.fill") }
+                            else { Label(adviceButtonTitle, systemImage: "sparkles") }
+                        }.buttonStyle(QuietButton())
+                            .accessibilityIdentifier("advice-button")
+                    }
+                }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(palette.card, in: RoundedRectangle(cornerRadius: 11))
+            }.padding(22)
         }
     }
-    private func stat(_ title: String, value: String, detail: String, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack { Image(systemName: icon).foregroundStyle(color); Text(title).foregroundStyle(palette.secondary) }.font(.system(size: 11))
-            Text(value).font(.system(size: 25, weight: .medium, design: .rounded)).monospacedDigit()
-            Text(detail).font(.system(size: 9)).foregroundStyle(palette.secondary).lineLimit(1)
-        }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(palette.card, in: RoundedRectangle(cornerRadius: 13))
+    private var advicePlaceholder: String {
+        if state.generating { return state.phase }
+        if !state.apiConfigured { return "连接 AI 后，可让老师结合当前局势给建议。" }
+        if !state.enabled { return "开启陪练后，结合当前局势生成建议。" }
+        if state.snapshot == nil { return "进入对局后，即可根据当前局势生成建议。" }
+        return "根据当前局势，给你一个下一步建议。"
     }
-    private func infoBanner(_ title: String, detail: String, icon: String) -> some View {
-        HStack(spacing: 12) { Image(systemName: icon).foregroundStyle(palette.secondary); VStack(alignment: .leading, spacing: 5) { Text(title).font(.system(size: 12, weight: .medium)); Text(detail).font(.system(size: 11)).foregroundStyle(palette.secondary) }; Spacer() }.padding(15).background(palette.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+    private var adviceButtonTitle: String {
+        if !state.apiConfigured { return "配置 AI" }
+        if !state.enabled { return "开启陪练" }
+        return "生成建议"
+    }
+    private func dashboardAdviceAction() {
+        if state.generating { state.stopGeneration() }
+        else if !state.apiConfigured { state.settingsOpen = true }
+        else if !state.enabled { state.setEnabled(true) }
+        else { state.askAdvice() }
+    }
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(palette.secondary)
+    }
+    private func compactMetric(_ title: String, value: String, detail: String, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 5) {
+                Image(systemName: icon).foregroundStyle(color)
+                Text(title).foregroundStyle(palette.secondary)
+            }.font(.system(size: 10))
+            Text(value).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
+            Text(detail).font(.system(size: 9)).foregroundStyle(palette.secondary).lineLimit(1)
+        }.padding(11).frame(maxWidth: .infinity, alignment: .leading)
+            .background(palette.card, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
