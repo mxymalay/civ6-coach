@@ -26,6 +26,9 @@ enum APITestResult: Equatable {
     static let isQA = ProcessInfo.processInfo.arguments.contains("--qa")
     static var preferences: UserDefaults { isQA ? UserDefaults(suiteName: "local.civ6.coach.desktop.qa")! : .standard }
     @Published var settings: Settings
+    @Published var appearancePreview: (theme: AppTheme, appearance: AppAppearance)?
+    var displayedTheme: AppTheme { appearancePreview?.theme ?? settings.theme }
+    var displayedAppearance: AppAppearance { appearancePreview?.appearance ?? settings.appearance }
     @Published var enabled = false
     @Published var snapshot: Snapshot?
     @Published var turnChanges = TurnChanges()

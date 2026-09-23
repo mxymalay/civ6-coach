@@ -2,6 +2,24 @@ import XCTest
 @testable import CivCoach
 
 final class StateTests: XCTestCase {
+    @MainActor func testAppearancePreviewDoesNotChangeSavedSettingsAndCanBeDiscarded() {
+        let state = AppState()
+        state.setEnabled(false)
+        let original = state.settings
+        state.appearancePreview = (.violet, .light)
+        XCTAssertEqual(state.displayedTheme, .violet)
+        XCTAssertEqual(state.displayedAppearance, .light)
+        XCTAssertEqual(state.settings, original)
+        state.appearancePreview = nil
+        XCTAssertEqual(state.displayedTheme, original.theme)
+        XCTAssertEqual(state.displayedAppearance, original.appearance)
+        state.appearancePreview = (.navy, .dark)
+        state.settings.theme = .navy
+        state.settings.appearance = .dark
+        state.appearancePreview = nil
+        XCTAssertEqual(state.displayedTheme, .navy)
+        XCTAssertEqual(state.displayedAppearance, .dark)
+    }
     @MainActor func testCoachingStartsWhenAppStateIsCreated() {
         let state = AppState()
         XCTAssertTrue(state.enabled, "Opening the app should start the local game reader without a switch")

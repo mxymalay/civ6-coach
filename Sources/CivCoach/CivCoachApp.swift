@@ -27,11 +27,11 @@ private struct CoachRootView: View {
     @Environment(\.openWindow) var openWindow
     @Environment(\.colorScheme) private var systemColorScheme
     private var themeStyle: AppThemeStyle {
-        AppThemeStyle(accent: state.settings.theme, appearance: state.settings.appearance, systemColorScheme: systemColorScheme)
+        AppThemeStyle(accent: state.displayedTheme, appearance: state.displayedAppearance, systemColorScheme: systemColorScheme)
     }
     var body: some View {
         MainView().environment(\.coachTheme, themeStyle)
-            .preferredColorScheme(state.settings.appearance.preferredColorScheme)
+            .environment(\.colorScheme, themeStyle.colorScheme)
             .onAppear { quickPanel.install(state: state, openMain: { openWindow(id: "main") }) }
     }
 }

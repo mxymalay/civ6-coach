@@ -148,7 +148,7 @@ struct MainView: View {
         .background(palette.background)
         .foregroundStyle(palette.primary.opacity(0.93))
         .frame(minWidth: 980, minHeight: 690)
-        .preferredColorScheme(theme.colorScheme)
+        .environment(\.colorScheme, theme.colorScheme)
         .sheet(isPresented: $state.settingsOpen) { SettingsView().environmentObject(state) }
         .background(WindowAccessor { window in
             window.identifier = NSUserInterfaceItemIdentifier("coach-main")

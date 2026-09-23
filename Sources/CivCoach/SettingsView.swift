@@ -58,7 +58,7 @@ struct SettingsView: View {
                     .accessibilityIdentifier("save-settings")
             }
         }.padding(28).frame(width: 620, height: 570).background(palette.background).foregroundStyle(palette.primary)
-        .environment(\.coachTheme, themeStyle).preferredColorScheme(draft.appearance.preferredColorScheme)
+        .environment(\.coachTheme, themeStyle).environment(\.colorScheme, themeStyle.colorScheme)
         .onAppear {
             draft = state.settings; state.clearTestResult()
             for profile in draft.apiProfiles {
@@ -73,7 +73,12 @@ struct SettingsView: View {
         .onChange(of: draft.model) { _ in state.clearTestResult() }
         .onChange(of: draft.style) { _ in state.clearTestResult() }
         .onChange(of: key) { _ in state.clearTestResult() }
-        .onDisappear { state.cancelTest() }
+        .onChange(of: draft.theme) { _ in previewAppearance() }
+        .onChange(of: draft.appearance) { _ in previewAppearance() }
+        .onDisappear { state.cancelTest(); state.appearancePreview = nil }
+    }
+    private func previewAppearance() {
+        state.appearancePreview = (draft.theme, draft.appearance)
     }
     private var apiPage: some View {
         VStack(alignment: .leading, spacing: 12) {

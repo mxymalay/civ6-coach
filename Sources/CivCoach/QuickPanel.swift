@@ -306,10 +306,10 @@ private struct QuickPanelRoot: View {
     @EnvironmentObject var quickPanel: QuickPanelController
     @Environment(\.colorScheme) private var systemColorScheme
     private var appearance: AppAppearance {
-        quickPanel.preferences.transparent ? .dark : state.settings.appearance
+        quickPanel.preferences.transparent ? .dark : state.displayedAppearance
     }
     private var themeStyle: AppThemeStyle {
-        AppThemeStyle(accent: state.settings.theme, appearance: appearance, systemColorScheme: systemColorScheme)
+        AppThemeStyle(accent: state.displayedTheme, appearance: appearance, systemColorScheme: systemColorScheme)
     }
     var body: some View {
         Group {
