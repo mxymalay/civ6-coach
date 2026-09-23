@@ -26,6 +26,7 @@ struct PanelPreferences: Codable {
     var height: Double { transparent ? overlayHeight : normalHeight }
     var dismissesOnOutsideClick: Bool { !pinned && !transparent }
     var presentation: PanelPresentation { PanelPresentation(transparent: transparent) }
+    mutating func openStandardCard() { transparent = false }
     init() {}
     enum CodingKeys: String, CodingKey { case pinned, transparent, normalWidth, normalHeight, overlayWidth, overlayHeight, width, height, overlay }
     init(from decoder: Decoder) throws {
@@ -150,7 +151,15 @@ private final class CoachPanel: NSPanel {
     }
     @objc func togglePanel() {
         guard let panel else { return }
-        if panel.isVisible { panel.orderOut(nil); return }
+        if panel.isVisible && !preferences.transparent { panel.orderOut(nil); return }
+        preferences.openStandardCard()
+        guideVisible = false
+        applyPresentation()
+        savePreferences()
+        showPanel()
+    }
+    private func showPanel() {
+        guard let panel else { return }
         if let buttonWindow = statusItem?.button?.window {
             let screen = buttonWindow.screen ?? NSScreen.main
             let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -269,7 +278,7 @@ private final class CoachPanel: NSPanel {
     }
     @objc func showGuide() {
         if !preferences.transparent { toggleOverlay() }
-        if panel?.isVisible != true { togglePanel() }
+        if panel?.isVisible != true { showPanel() }
         guideVisible = true
     }
     func showMain(settings: Bool = false, chat: Bool = false) {

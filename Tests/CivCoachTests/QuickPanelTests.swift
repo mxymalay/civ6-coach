@@ -3,6 +3,23 @@ import AppKit
 @testable import CivCoach
 
 final class QuickPanelTests: XCTestCase {
+    func testMenuOpenRestoresStandardCardWithoutLosingOverlayPreferences() {
+        var value = PanelPreferences()
+        value.pinned = true
+        value.resize(width: 420, height: 380)
+        value.transparent = true
+        value.resize(width: 280, height: 190)
+        value.overlay.fontSize = 22
+        value.openStandardCard()
+        XCTAssertFalse(value.transparent)
+        XCTAssertTrue(value.pinned)
+        XCTAssertEqual(value.width, 420)
+        XCTAssertEqual(value.height, 380)
+        XCTAssertEqual(value.overlay.fontSize, 22)
+        value.transparent = true
+        XCTAssertEqual(value.width, 280)
+        XCTAssertEqual(value.height, 190)
+    }
     func testLegacyPanelGetsFirstRunGuideAndDefaultTypography() throws {
         let value = try JSONDecoder().decode(PanelPreferences.self, from: Data("{}".utf8))
         XCTAssertTrue(value.overlay.shouldShowGuide)
