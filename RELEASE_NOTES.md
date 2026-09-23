@@ -12,9 +12,9 @@
 
 ## 安装
 
-下载附件 `文明VI陪练-0.8.5-macOS.zip`，解压并将应用移至「应用程序」。需要 macOS 13+ 和 Apple Silicon；Intel 尚未验证，可尝试源码构建。
+下载附件 `Civ6Coach-0.8.5-macOS-arm64.zip`，解压并将应用移至「应用程序」。需要 macOS 13+ 和 Apple Silicon；Intel 尚未验证，可尝试源码构建。
 
-游戏连接需手动启用 `EnableTuner 1`、重启游戏并进入单人地图。启用 Tuner 会影响成就。详细步骤和 API 配置见 [README](https://github.com/mxymalay/civ6-coach/blob/v0.8.5/README.md)。
+游戏连接需手动启用 `EnableTuner 1`、重启游戏并进入单人地图。启用 Tuner 会影响成就。详细步骤和 API 配置见 [README](https://github.com/mxymalay/civ6-coach#readme)。
 
 ## 注意事项
 

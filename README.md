@@ -8,7 +8,7 @@
 
 **最新版本：v0.8.5** · macOS 13 及以上 · 本次预编译包为 Apple Silicon（arm64）。Intel 用户请尝试从源码构建，尚未验证。
 
-[下载 macOS 安装包](https://github.com/mxymalay/civ6-coach/releases/download/v0.8.5/文明VI陪练-0.8.5-macOS.zip) · [查看所有版本](https://github.com/mxymalay/civ6-coach/releases)
+[下载 macOS 安装包](https://github.com/mxymalay/civ6-coach/releases/download/v0.8.5/Civ6Coach-0.8.5-macOS-arm64.zip) · [查看所有版本](https://github.com/mxymalay/civ6-coach/releases)
 
 1. 下载 ZIP 并解压，将「文明 VI 陪练 0.8.5.app」移到「应用程序」目录。
 2. 按下方「连接游戏」说明启用本机 Tuner，重启游戏并进入单人地图。
