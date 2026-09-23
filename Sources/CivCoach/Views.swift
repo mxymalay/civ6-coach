@@ -24,6 +24,62 @@ struct QuietButton: ButtonStyle {
             .foregroundStyle(palette.primary.opacity(configuration.isPressed ? 0.6 : 0.86)).background(palette.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 9))
     }
 }
+struct CoachInputStyle: ViewModifier {
+    @Environment(\.coachTheme) private var theme
+    var focused: Bool
+    var fill: Color? = nil
+    private var palette: ThemePalette { theme.palette }
+
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain)
+            .font(.system(size: 12))
+            .foregroundStyle(palette.primary)
+            .tint(palette.mint)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(fill ?? palette.sidebar, in: RoundedRectangle(cornerRadius: 9))
+            .overlay {
+                RoundedRectangle(cornerRadius: 9)
+                    .strokeBorder(focused ? palette.mint.opacity(0.85) : palette.secondary.opacity(0.24), lineWidth: focused ? 1.5 : 1)
+            }
+            .shadow(color: focused ? palette.mint.opacity(0.11) : .clear, radius: 5)
+    }
+}
+
+struct CoachChoiceBar<Choice: Hashable>: View {
+    @Environment(\.coachTheme) private var theme
+    @Binding var selection: Choice
+    let choices: [Choice]
+    let title: (Choice) -> String
+    private var palette: ThemePalette { theme.palette }
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(choices, id: \.self) { choice in
+                let selected = selection == choice
+                Button { selection = choice } label: {
+                    Text(title(choice))
+                        .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                        .foregroundStyle(selected ? palette.mint : palette.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(selected ? palette.card : .clear, in: RoundedRectangle(cornerRadius: 7))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 7)
+                                .strokeBorder(selected ? palette.mint.opacity(0.38) : .clear)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title(choice))
+                .accessibilityValue(selected ? "已选择" : "未选择")
+            }
+        }
+        .padding(3)
+        .background(palette.sidebar, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(palette.secondary.opacity(0.16)))
+    }
+}
 struct MainView: View {
     @Environment(\.coachTheme) private var theme
     private var palette: ThemePalette { theme.palette }
@@ -283,6 +339,7 @@ struct ChatView: View {
     @Environment(\.coachTheme) private var theme
     private var palette: ThemePalette { theme.palette }
     @EnvironmentObject var state: AppState
+    @FocusState private var inputFocused: Bool
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -327,7 +384,9 @@ struct ChatView: View {
             VStack(spacing: 10) {
                 HStack(alignment: .bottom, spacing: 12) {
                     TextField(state.enabled ? "问问老师：为什么现在应该这样做？" : "开启陪练后开始聊天", text: $state.draft, axis: .vertical)
-                        .textFieldStyle(.plain).font(.system(size: 13)).lineLimit(2...5).padding(13).background(palette.card, in: RoundedRectangle(cornerRadius: 12)).disabled(!state.enabled)
+                        .lineLimit(2...5).focused($inputFocused)
+                        .modifier(CoachInputStyle(focused: inputFocused, fill: palette.card))
+                        .disabled(!state.enabled)
                         .accessibilityIdentifier("chat-input")
                     if state.generating {
                         Button { state.stopGeneration() } label: { Image(systemName: "stop.fill").frame(width: 20, height: 24) }.buttonStyle(PrimaryButton()).help("停止生成")
