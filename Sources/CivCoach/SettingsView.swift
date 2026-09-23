@@ -1,11 +1,12 @@
 import SwiftUI
 
 private enum SettingsPage: String, CaseIterable {
-    case api = "API", appearance = "外观", coaching = "陪练与隐私"
+    case api = "API", appearance = "外观", overlay = "透明小窗", coaching = "陪练与隐私"
 }
 
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var quickPanel: QuickPanelController
     @Environment(\.dismiss) var dismiss
     @Environment(\.coachTheme) private var inheritedTheme
     @State private var draft = Settings()
@@ -40,6 +41,7 @@ struct SettingsView: View {
                     switch page {
                     case .api: apiPage
                     case .appearance: appearancePage
+                    case .overlay: overlayPage
                     case .coaching: coachingPage
                     }
                 }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
@@ -184,6 +186,37 @@ struct SettingsView: View {
             Toggle("在本机保存对话记录", isOn: $draft.rememberChat)
             Text("关闭保存会移除当前对话的本地副本，历史归档仍保留。游戏读取仅在本机进行，刷新不会自动调用 AI。只有点建议或发送聊天时，才将相关数据发送到 API。").font(.system(size: 11)).foregroundStyle(palette.secondary).lineSpacing(5)
         }.font(.system(size: 12)).toggleStyle(.switch).tint(palette.mint).controlSize(.small)
+    }
+    private var overlayPage: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("操作引导").font(.system(size: 15, weight: .semibold))
+                Spacer()
+                Text("即时生效").font(.system(size: 10)).foregroundStyle(palette.secondary)
+            }
+            Toggle("首次进入时显示引导", isOn: overlayBinding(\.guideEnabled))
+                .toggleStyle(.switch).tint(palette.mint).controlSize(.small)
+            Button { dismiss(); quickPanel.showGuide() } label: {
+                Label("重新引导", systemImage: "questionmark.circle")
+            }.buttonStyle(QuietButton())
+            Divider()
+            Text("文字样式").font(.system(size: 15, weight: .semibold))
+            Text("字号").font(.system(size: 12))
+            CoachChoiceBar(selection: overlayBinding(\.fontSize), choices: [10, 12, 14, 16, 18, 22, 26], title: { String($0) })
+            Text("字体").font(.system(size: 12))
+            CoachChoiceBar(selection: overlayBinding(\.font), choices: OverlayFont.allCases, title: { $0.rawValue })
+            Text("颜色").font(.system(size: 12))
+            CoachChoiceBar(selection: overlayBinding(\.color), choices: OverlayColor.allCases, title: { $0.rawValue })
+            Text("阴影").font(.system(size: 12))
+            CoachChoiceBar(selection: overlayBinding(\.shadow), choices: OverlayShadow.allCases, title: { $0.rawValue })
+        }
+    }
+    private func overlayBinding<Value>(_ path: WritableKeyPath<OverlayOptions, Value>) -> Binding<Value> {
+        Binding(get: { quickPanel.preferences.overlay[keyPath: path] }, set: { value in
+            var options = quickPanel.preferences.overlay
+            options[keyPath: path] = value
+            quickPanel.updateOverlayOptions(options)
+        })
     }
     private func addProfile() {
         let id = draft.addAPIProfile()

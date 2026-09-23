@@ -3,6 +3,29 @@ import AppKit
 @testable import CivCoach
 
 final class QuickPanelTests: XCTestCase {
+    func testLegacyPanelGetsFirstRunGuideAndDefaultTypography() throws {
+        let value = try JSONDecoder().decode(PanelPreferences.self, from: Data("{}".utf8))
+        XCTAssertTrue(value.overlay.shouldShowGuide)
+        XCTAssertEqual(value.overlay.fontSize, 14)
+        XCTAssertEqual(value.overlay.font, .system)
+    }
+    func testOverlayStylesAndGuidePersist() throws {
+        var value = PanelPreferences()
+        value.overlay.fontSize = 22
+        value.overlay.font = .serif
+        value.overlay.color = .cream
+        value.overlay.shadow = .strong
+        value.overlay.guideSeen = true
+        let restored = try JSONDecoder().decode(PanelPreferences.self, from: JSONEncoder().encode(value))
+        XCTAssertEqual(restored.overlay, value.overlay)
+        XCTAssertFalse(restored.overlay.shouldShowGuide)
+        value.overlay.guideSeen = false
+        value.overlay.guideEnabled = false
+        XCTAssertFalse(value.overlay.shouldShowGuide)
+        value.overlay.fontSize = 900
+        let clamped = try JSONDecoder().decode(PanelPreferences.self, from: JSONEncoder().encode(value))
+        XCTAssertEqual(clamped.overlay.fontSize, 26)
+    }
     func testHeaderDragDoesNotStealButtonsTextOrResizeEdges() {
         let bounds = NSRect(x: 0, y: 0, width: 380, height: 400)
         for transparent in [false, true] {

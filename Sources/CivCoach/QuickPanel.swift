@@ -15,6 +15,7 @@ struct PanelPresentation {
 }
 
 struct PanelPreferences: Codable {
+    var overlay = OverlayOptions()
     var pinned = false
     var transparent = false
     private var normalWidth = 380.0
@@ -26,9 +27,11 @@ struct PanelPreferences: Codable {
     var dismissesOnOutsideClick: Bool { !pinned && !transparent }
     var presentation: PanelPresentation { PanelPresentation(transparent: transparent) }
     init() {}
-    enum CodingKeys: String, CodingKey { case pinned, transparent, normalWidth, normalHeight, overlayWidth, overlayHeight, width, height }
+    enum CodingKeys: String, CodingKey { case pinned, transparent, normalWidth, normalHeight, overlayWidth, overlayHeight, width, height, overlay }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        overlay = try c.decodeIfPresent(OverlayOptions.self, forKey: .overlay) ?? OverlayOptions()
+        overlay.fontSize = max(10, min(26, overlay.fontSize))
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
         let mode = try c.decodeIfPresent(Bool.self, forKey: .transparent)
         transparent = true
@@ -46,6 +49,7 @@ struct PanelPreferences: Codable {
     }
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(overlay, forKey: .overlay)
         try c.encode(pinned, forKey: .pinned)
         try c.encode(transparent, forKey: .transparent)
         try c.encode(normalWidth, forKey: .normalWidth)
@@ -92,6 +96,7 @@ private final class CoachPanel: NSPanel {
 }
 
 @MainActor final class QuickPanelController: NSObject, ObservableObject, NSWindowDelegate {
+    @Published private(set) var guideVisible = false
     @Published private(set) var preferences: PanelPreferences
     private var statusItem: NSStatusItem?
     private var panel: NSPanel?
@@ -156,6 +161,7 @@ private final class CoachPanel: NSPanel {
             panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: false)
         }
         panel.makeKeyAndOrderFront(nil)
+        if preferences.transparent { guideVisible = preferences.overlay.shouldShowGuide }
     }
     func togglePin() {
         preferences.pinned.toggle()
@@ -163,6 +169,7 @@ private final class CoachPanel: NSPanel {
     }
     func toggleOverlay() {
         preferences.transparent.toggle()
+        guideVisible = preferences.transparent && preferences.overlay.shouldShowGuide
         applyPresentation()
         savePreferences()
     }
@@ -212,11 +219,58 @@ private final class CoachPanel: NSPanel {
         generate.isEnabled = state?.generating == true || state?.apiConfigured == true
         generate.toolTip = generate.isEnabled ? nil : "请先配置 AI"
         menu.addItem(generate)
+        let textItem = NSMenuItem(title: "文字设置", action: nil, keyEquivalent: "")
+        let textMenu = NSMenu()
+        func addChoices(_ title: String, kind: String, choices: [String], selected: String) {
+            let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            let submenu = NSMenu()
+            for choice in choices {
+                let item = NSMenuItem(title: choice, action: #selector(changeOverlayText(_:)), keyEquivalent: "")
+                item.target = self; item.representedObject = [kind, choice]
+                item.state = choice == selected ? .on : .off
+                submenu.addItem(item)
+            }
+            parent.submenu = submenu; textMenu.addItem(parent)
+        }
+        let options = preferences.overlay
+        addChoices("字号", kind: "size", choices: [10, 12, 14, 16, 18, 22, 26].map(String.init), selected: String(options.fontSize))
+        addChoices("字体", kind: "font", choices: OverlayFont.allCases.map(\.rawValue), selected: options.font.rawValue)
+        addChoices("颜色", kind: "color", choices: OverlayColor.allCases.map(\.rawValue), selected: options.color.rawValue)
+        addChoices("阴影", kind: "shadow", choices: OverlayShadow.allCases.map(\.rawValue), selected: options.shadow.rawValue)
+        textItem.submenu = textMenu; menu.addItem(textItem)
+        let guide = NSMenuItem(title: "操作引导", action: #selector(showGuide), keyEquivalent: "")
+        guide.target = self; menu.addItem(guide)
         menu.addItem(.separator())
         let exit = NSMenuItem(title: "退出透明", action: #selector(exitOverlay), keyEquivalent: "")
         exit.target = self
         menu.addItem(exit)
         return menu
+    }
+    @objc private func changeOverlayText(_ sender: NSMenuItem) {
+        guard let parts = sender.representedObject as? [String], parts.count == 2 else { return }
+        var options = preferences.overlay
+        switch parts[0] {
+        case "size": options.fontSize = Int(parts[1]) ?? 14
+        case "font": options.font = OverlayFont(rawValue: parts[1]) ?? .system
+        case "color": options.color = OverlayColor(rawValue: parts[1]) ?? .white
+        case "shadow": options.shadow = OverlayShadow(rawValue: parts[1]) ?? .normal
+        default: return
+        }
+        updateOverlayOptions(options)
+    }
+    func updateOverlayOptions(_ options: OverlayOptions) {
+        preferences.overlay = options
+        preferences.overlay.fontSize = max(10, min(26, options.fontSize))
+        if !options.guideEnabled { guideVisible = false }
+        savePreferences()
+    }
+    func dismissGuide() {
+        guideVisible = false; preferences.overlay.guideSeen = true; savePreferences()
+    }
+    @objc func showGuide() {
+        if !preferences.transparent { toggleOverlay() }
+        if panel?.isVisible != true { togglePanel() }
+        guideVisible = true
     }
     func showMain(settings: Bool = false, chat: Bool = false) {
         if chat { state?.selectedTab = "和老师聊聊" }
