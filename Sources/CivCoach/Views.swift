@@ -172,6 +172,16 @@ struct MainView: View {
             if state.generating { ProgressView().controlSize(.small); Text(state.phase).font(.system(size: 11)).foregroundStyle(palette.secondary) }
             Button { state.refresh() } label: { Label(state.refreshing ? "读取中" : "刷新局势", systemImage: "arrow.clockwise") }
                 .buttonStyle(QuietButton()).disabled(!state.enabled || state.refreshing || state.generating).keyboardShortcut("r", modifiers: .command)
+            Button { state.toggleMainPin() } label: {
+                Image(systemName: state.settings.alwaysOnTop ? "pin.fill" : "pin")
+                    .foregroundStyle(state.settings.alwaysOnTop ? palette.mint : palette.secondary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help(state.settings.alwaysOnTop ? "取消固定主窗口" : "固定主窗口：保持在最前面")
+            .accessibilityLabel("固定主窗口")
+            .accessibilityValue(state.settings.alwaysOnTop ? "已固定" : "未固定")
+            .accessibilityIdentifier("pin-main")
         }.padding(.horizontal, 28).padding(.vertical, 20)
         .overlay(alignment: .bottom) { Rectangle().fill(palette.line).frame(height: 1) }
     }

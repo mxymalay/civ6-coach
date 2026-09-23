@@ -1,6 +1,27 @@
 import SwiftUI
 import AppKit
 
+enum APITestResult: Equatable {
+    case success
+    case cancelled
+    case failure(String)
+
+    var message: String {
+        switch self {
+        case .success: return "连接成功，可以开始聊天。"
+        case .cancelled: return "测试已取消。"
+        case .failure(let detail): return detail
+        }
+    }
+    var icon: String {
+        switch self {
+        case .success: return "checkmark.circle.fill"
+        case .cancelled: return "minus.circle"
+        case .failure: return "exclamationmark.circle.fill"
+        }
+    }
+}
+
 @MainActor final class AppState: ObservableObject {
     static let isQA = ProcessInfo.processInfo.arguments.contains("--qa")
     static var preferences: UserDefaults { isQA ? UserDefaults(suiteName: "local.civ6.coach.desktop.qa")! : .standard }
@@ -21,12 +42,13 @@ import AppKit
     @Published var selectedTab = "局势与建议"
     @Published var draft = ""
     @Published var testing = false
-    @Published var testResult: String?
+    @Published var testResult: APITestResult?
     private let game = GameClient()
     private var pollTask: Task<Void,Never>?
     private var refreshTask: Task<Void,Never>?
     private var generationTask: Task<Void,Never>?
     private var testTask: Task<Void,Never>?
+    private var testID = UUID()
     private var runID = UUID()
     private var serviceID = UUID()
     private var lastIdentity: String?
@@ -176,23 +198,44 @@ import AppKit
         try Keychain.save(key.trimmingCharacters(in: .whitespacesAndNewlines), account: value.keyAccount)
         settings = value
         Self.preferences.set(try JSONEncoder().encode(value), forKey: "coach.settings.v1")
-        for window in NSApp.windows where window.identifier?.rawValue == "coach-main" { window.level = value.alwaysOnTop ? .floating : .normal }
+        applyMainWindowLevel()
         if !value.rememberChat { try? FileManager.default.removeItem(at: Self.dataFolder.appendingPathComponent("conversation.json")) }
         else { persistChat() }
     }
+    func toggleMainPin() {
+        var updated = settings
+        updated.alwaysOnTop.toggle()
+        do {
+            Self.preferences.set(try JSONEncoder().encode(updated), forKey: "coach.settings.v1")
+            settings = updated
+            applyMainWindowLevel()
+        } catch { self.error = "固定主窗口失败：" + error.localizedDescription }
+    }
+    private func applyMainWindowLevel() {
+        for window in NSApp.windows where window.identifier?.rawValue == "coach-main" {
+            window.level = settings.alwaysOnTop ? .floating : .normal
+        }
+    }
     func testAPI(_ value: Settings, key: String) {
         guard !testing else { return }
+        testID = UUID(); let id = testID
         testing = true; testResult = nil
         testTask = Task {
-            defer { testing = false }
+            defer { if id == testID { testing = false } }
             do {
                 try await AIClient.stream(settings: value, key: key, messages: [["role":"user", "content":"只回复：连接成功"]], system: "这是连接测试，请简短回答。") { _ in }
-                testResult = "连接成功，可以开始聊天。"
-            } catch is CancellationError { testResult = "测试已取消。" }
-            catch { testResult = error.localizedDescription }
+                if id == testID { testResult = .success }
+            } catch is CancellationError { if id == testID { testResult = .cancelled } }
+            catch { if id == testID { testResult = .failure(error.localizedDescription) } }
         }
     }
     func cancelTest() { testTask?.cancel() }
+    func clearTestResult() {
+        testID = UUID()
+        testTask?.cancel()
+        testing = false
+        testResult = nil
+    }
     func archiveAndClear(force: Bool = false) {
         guard force || !generating else { return }
         if settings.rememberChat && !messages.isEmpty {

@@ -56,11 +56,14 @@ struct SettingsView: View {
         }.padding(28).frame(width: 620, height: 570).background(palette.background).foregroundStyle(palette.primary)
         .environment(\.coachTheme, themeStyle).preferredColorScheme(draft.appearance.preferredColorScheme)
         .onAppear {
-            draft = state.settings; initialEndpoint = draft.endpoint; state.testResult = nil
+            draft = state.settings; initialEndpoint = draft.endpoint; state.clearTestResult()
             do { key = try Keychain.load(account: draft.keyAccount); initialKey = key }
             catch { localError = error.localizedDescription }
         }
-        .onChange(of: draft.endpoint) { value in key = value == initialEndpoint ? initialKey : ""; state.testResult = nil }
+        .onChange(of: draft.endpoint) { value in key = value == initialEndpoint ? initialKey : ""; state.clearTestResult() }
+        .onChange(of: draft.model) { _ in state.clearTestResult() }
+        .onChange(of: draft.style) { _ in state.clearTestResult() }
+        .onChange(of: key) { _ in state.clearTestResult() }
         .onDisappear { state.cancelTest() }
     }
     private var apiPage: some View {
@@ -84,12 +87,20 @@ struct SettingsView: View {
                     .focused($focusedField, equals: .key).accessibilityIdentifier("api-key")
             }
             Text("密钥保存到 macOS 钥匙串。更换地址会清空密钥输入，改回原地址会恢复。请求直接发送到你填写的地址。").font(.system(size: 10)).foregroundStyle(palette.secondary)
-            HStack {
+            HStack(spacing: 10) {
                 Button(state.testing ? "测试中…" : "测试连接") { state.testAPI(draft, key: key) }.buttonStyle(QuietButton()).disabled(state.testing || draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("test-api")
                 if state.testing { ProgressView().controlSize(.small); Button("停止测试") { state.cancelTest() }.buttonStyle(.plain) }
+                if let result = state.testResult {
+                    Image(systemName: result.icon)
+                        .foregroundStyle(testResultColor(result))
+                    Text(result.message)
+                        .foregroundStyle(testResultColor(result))
+                        .lineLimit(2)
+                        .help(result.message)
+                        .accessibilityIdentifier("api-test-result")
+                }
             }
             Text("测试会发送简短请求，可能产生少量费用。").font(.system(size: 10)).foregroundStyle(palette.secondary)
-            if let result = state.testResult { Text(result).foregroundStyle(palette.secondary).textSelection(.enabled) }
         }.font(.system(size: 12))
     }
     private var appearancePage: some View {
@@ -114,8 +125,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier("appearance-mode")
             Text("强调色只改变界面点缀色；深浅外观可独立选择，也可跟随 macOS 系统设置。保存后同步主窗口与快捷小窗。")
                 .font(.system(size: 11)).foregroundStyle(palette.secondary)
-            Toggle("主窗口保持在最前面", isOn: $draft.alwaysOnTop).toggleStyle(.switch).tint(palette.mint).controlSize(.small)
-            Text("图钉只控制普通卡片固定；虚线矩形图标进入透明游戏叠加层并自动置顶。透明层只保留建议与小图标，实心矩形图标退出透明。拖动顶部移动、拖动四边或四角缩放，两种模式分别记住尺寸。").font(.system(size: 11)).foregroundStyle(palette.secondary)
+            Text("主窗口右上角图钉可单独固定主窗口；快捷卡片也有自己的图钉。虚线矩形图标进入透明游戏叠加层并自动置顶。透明层只保留建议与小图标，实心矩形图标退出透明。拖动顶部移动、拖动四边或四角缩放，两种模式分别记住尺寸。").font(.system(size: 11)).foregroundStyle(palette.secondary)
         }.font(.system(size: 12))
     }
     private var coachingPage: some View {
@@ -125,6 +135,7 @@ struct SettingsView: View {
                 TextField("例如：基础运营 / 科技胜利", text: $draft.goal)
                     .focused($focusedField, equals: .goal)
             }
+            Text("这段文字会附加到 AI 的教师提示词中，不是整套模板。可写“先学基础运营”“科技胜利”“文化胜利”或“征服胜利”，也可以自由描述。").font(.system(size: 11)).foregroundStyle(palette.secondary)
             HStack(spacing: 12) {
                 Text("局势刷新").frame(width: 76, alignment: .leading)
                 CoachChoiceBar(selection: $draft.pollSeconds, choices: [5, 8, 15, 30], title: { "每 \($0) 秒" })
@@ -139,6 +150,13 @@ struct SettingsView: View {
         HStack(spacing: 12) {
             Text(title).frame(width: 76, alignment: .leading)
             content().modifier(CoachInputStyle(focused: focused))
+        }
+    }
+    private func testResultColor(_ result: APITestResult) -> Color {
+        switch result {
+        case .success: return palette.mint
+        case .cancelled: return palette.secondary
+        case .failure: return palette.gold
         }
     }
 }
