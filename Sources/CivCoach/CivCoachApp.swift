@@ -15,8 +15,7 @@ import AppKit
                 Button("显示或收起快捷小窗") { quickPanel.togglePanel() }.keyboardShortcut("j", modifiers: [.command, .shift])
                 Button(quickPanel.preferences.pinned ? "取消固定普通卡片" : "固定普通卡片") { quickPanel.togglePin() }.keyboardShortcut("o", modifiers: [.command, .shift])
                 Button(quickPanel.preferences.transparent ? "退出透明叠加层" : "进入透明叠加层") { quickPanel.toggleOverlay() }.keyboardShortcut("g", modifiers: [.command, .shift])
-                Button(state.enabled ? "暂停陪练" : "开启陪练") { state.setEnabled(!state.enabled) }.keyboardShortcut("p", modifiers: [.command, .shift])
-                Button("一键 AI 建议") { state.askAdvice() }.disabled(!state.enabled || state.generating).keyboardShortcut("j", modifiers: .command)
+                Button("一键 AI 建议") { state.askAdvice() }.disabled(state.generating).keyboardShortcut("j", modifiers: .command)
                 Button("停止回答") { state.stopGeneration() }.disabled(!state.generating)
             }
         }
@@ -58,11 +57,7 @@ struct MenuContent: View {
                 }.buttonStyle(.plain).help("透明游戏叠加层 · 自动置顶").accessibilityLabel("进入透明叠加层").accessibilityIdentifier("enter-overlay")
                 Button { quickPanel.closePanel() } label: { Image(systemName: "xmark").foregroundStyle(palette.secondary).frame(width: 24, height: 26) }.buttonStyle(.plain).help("收起小窗").accessibilityLabel("收起小窗")
             }
-            HStack {
-                Text(state.status).font(.system(size: 11)).foregroundStyle(palette.secondary)
-                Spacer()
-                Toggle("开启陪练", isOn: Binding(get: { state.enabled }, set: { state.setEnabled($0) })).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(palette.mint)
-            }
+            Text(state.status).font(.system(size: 11)).foregroundStyle(palette.secondary)
             if let snap = state.snapshot {
                 HStack { Text("第 \(snap.turn) 回合").fontWeight(.semibold); Spacer(); Text("\(snap.cities.count) 城 · \(snap.units.count) 单位") }.font(.system(size: 12))
             }
@@ -88,7 +83,7 @@ struct MenuContent: View {
                             }
                         }
                     } else {
-                        Text("载入游戏地图并开启陪练，即可在这里查看提醒和获取建议。").font(.system(size: 12)).foregroundStyle(palette.secondary)
+                        Text("载入游戏地图，即可在这里查看提醒和获取建议。").font(.system(size: 12)).foregroundStyle(palette.secondary)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
             }.frame(minHeight: 70, maxHeight: .infinity).background(palette.card, in: RoundedRectangle(cornerRadius: 8))
@@ -105,7 +100,7 @@ struct MenuContent: View {
                     Button {
                         if state.apiConfigured { state.askAdvice() } else { quickPanel.showMain(settings: true) }
                     } label: { Label("建议", systemImage: "sparkles") }
-                        .buttonStyle(.bordered).controlSize(.small).tint(palette.mint).disabled(!state.enabled)
+                        .buttonStyle(.bordered).controlSize(.small).tint(palette.mint)
                 }
             }.buttonStyle(.plain).font(.system(size: 12))
         }.padding(12).frame(minWidth: 320, maxWidth: .infinity, minHeight: 280, maxHeight: .infinity).background(palette.background).foregroundStyle(palette.primary).preferredColorScheme(theme.colorScheme)

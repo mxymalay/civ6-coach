@@ -120,19 +120,11 @@ struct MainView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("文明 VI 陪练").font(.system(size: 17, weight: .semibold))
                 }
-            }.padding(.top, 25).padding(.bottom, 24)
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("陪练").font(.system(size: 13, weight: .medium))
-                }
-                Spacer()
-                Toggle("开启陪练", isOn: Binding(get: { state.enabled }, set: { state.setEnabled($0) })).labelsHidden().toggleStyle(.switch).tint(palette.mint).controlSize(.small)
-                    .accessibilityIdentifier("coach-toggle")
-            }.padding(12).background(palette.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+            }.padding(.top, 25).padding(.bottom, 14)
             VStack(spacing: 7) {
                 navItem("局势与建议", icon: "square.grid.2x2")
                 navItem("和老师聊聊", icon: "bubble.left.and.bubble.right")
-            }.padding(.top, 18)
+            }.padding(.top, 2)
             Rectangle().fill(palette.line).frame(height: 1).padding(.vertical, 16)
             Text("当前对局").font(.system(size: 10, weight: .semibold)).foregroundStyle(palette.secondary)
             if let snap = state.snapshot {
@@ -171,7 +163,7 @@ struct MainView: View {
             Spacer()
             if state.generating { ProgressView().controlSize(.small); Text(state.phase).font(.system(size: 11)).foregroundStyle(palette.secondary) }
             Button { state.refresh() } label: { Label(state.refreshing ? "读取中" : "刷新局势", systemImage: "arrow.clockwise") }
-                .buttonStyle(QuietButton()).disabled(!state.enabled || state.refreshing || state.generating).keyboardShortcut("r", modifiers: .command)
+                .buttonStyle(QuietButton()).disabled(state.refreshing || state.generating).keyboardShortcut("r", modifiers: .command)
             Button { state.toggleMainPin() } label: {
                 Image(systemName: state.settings.alwaysOnTop ? "pin.fill" : "pin")
                     .foregroundStyle(state.settings.alwaysOnTop ? palette.mint : palette.secondary)
@@ -198,11 +190,11 @@ struct MainView: View {
                         Spacer()
                         HStack(spacing: 5) {
                             Circle().fill(state.live ? palette.mint : palette.secondary).frame(width: 6, height: 6)
-                            Text(state.live ? "实时" : "已暂停").font(.system(size: 10)).foregroundStyle(palette.secondary)
+                            Text(state.live ? "实时" : "等待连接").font(.system(size: 10)).foregroundStyle(palette.secondary)
                         }
                         Button { state.refresh() } label: {
                             Image(systemName: state.refreshing ? "hourglass" : "arrow.clockwise").frame(width: 28, height: 28)
-                        }.buttonStyle(.plain).help("刷新局势").disabled(!state.enabled || state.refreshing || state.generating)
+                        }.buttonStyle(.plain).help("刷新局势").disabled(state.refreshing || state.generating)
                     }.padding(.bottom, 2)
 
                     if let error = state.connectionError {
@@ -258,7 +250,7 @@ struct MainView: View {
                         Image(systemName: "map").font(.system(size: 25)).foregroundStyle(palette.mint)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("还没连接对局").font(.system(size: 14, weight: .medium))
-                            Text("进入单人地图并开启陪练").font(.system(size: 11)).foregroundStyle(palette.secondary)
+                            Text("进入单人地图后自动连接").font(.system(size: 11)).foregroundStyle(palette.secondary)
                         }
                         Spacer()
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
@@ -304,19 +296,16 @@ struct MainView: View {
     private var advicePlaceholder: String {
         if state.generating { return state.phase }
         if !state.apiConfigured { return "连接 AI 后，可让老师结合当前局势给建议。" }
-        if !state.enabled { return "开启陪练后，结合当前局势生成建议。" }
         if state.snapshot == nil { return "进入对局后，即可根据当前局势生成建议。" }
         return "根据当前局势，给你一个下一步建议。"
     }
     private var adviceButtonTitle: String {
         if !state.apiConfigured { return "配置 AI" }
-        if !state.enabled { return "开启陪练" }
         return "生成建议"
     }
     private func dashboardAdviceAction() {
         if state.generating { state.stopGeneration() }
         else if !state.apiConfigured { state.settingsOpen = true }
-        else if !state.enabled { state.setEnabled(true) }
         else { state.askAdvice() }
     }
     private func sectionTitle(_ title: String) -> some View {
@@ -393,15 +382,14 @@ struct ChatView: View {
             }
             VStack(spacing: 10) {
                 HStack(alignment: .bottom, spacing: 12) {
-                    TextField(state.enabled ? "问问老师：为什么现在应该这样做？" : "开启陪练后开始聊天", text: $state.draft, axis: .vertical)
+                    TextField("问问老师：为什么现在应该这样做？", text: $state.draft, axis: .vertical)
                         .lineLimit(2...5).focused($inputFocused)
                         .modifier(CoachInputStyle(focused: inputFocused, fill: palette.card))
-                        .disabled(!state.enabled)
                         .accessibilityIdentifier("chat-input")
                     if state.generating {
                         Button { state.stopGeneration() } label: { Image(systemName: "stop.fill").frame(width: 20, height: 24) }.buttonStyle(PrimaryButton()).help("停止生成")
                     } else {
-                        Button { state.sendDraft() } label: { Image(systemName: "arrow.up").frame(width: 20, height: 24) }.buttonStyle(PrimaryButton()).disabled(!state.enabled || state.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button { state.sendDraft() } label: { Image(systemName: "arrow.up").frame(width: 20, height: 24) }.buttonStyle(PrimaryButton()).disabled(state.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             .keyboardShortcut(.return, modifiers: .command).help("发送 ⌘↩").accessibilityIdentifier("send-chat")
                     }
                 }

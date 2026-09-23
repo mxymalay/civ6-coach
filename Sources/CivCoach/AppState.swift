@@ -65,6 +65,7 @@ enum APITestResult: Equatable {
             // but never send it to AI without a reliably matched game identifier.
             restoredHistoryCount = messages.count
         }
+        setEnabled(true)
     }
     var apiConfigured: Bool { !settings.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     var modelLabel: String { settings.model }

@@ -191,14 +191,12 @@ private final class CoachPanel: NSPanel {
     var overlayActionTitle: String {
         guard let state else { return "生成建议" }
         if state.generating { return "停止生成" }
-        if !state.enabled { return "开启陪练" }
         if !state.apiConfigured { return "配置 AI" }
         return "生成建议"
     }
     @objc func performOverlayAction() {
         guard let state else { return }
         if state.generating { state.stopGeneration() }
-        else if !state.enabled { state.setEnabled(true) }
         else if !state.apiConfigured { showMain(settings: true) }
         else { state.askAdvice() }
     }
@@ -211,8 +209,8 @@ private final class CoachPanel: NSPanel {
         let generate = NSMenuItem(title: state?.generating == true ? "停止生成" : "生成建议",
                                   action: #selector(performOverlayAction), keyEquivalent: "")
         generate.target = self
-        generate.isEnabled = state?.generating == true || (state?.enabled == true && state?.apiConfigured == true)
-        generate.toolTip = generate.isEnabled ? nil : "请先开启陪练并配置 AI"
+        generate.isEnabled = state?.generating == true || state?.apiConfigured == true
+        generate.toolTip = generate.isEnabled ? nil : "请先配置 AI"
         menu.addItem(generate)
         menu.addItem(.separator())
         let exit = NSMenuItem(title: "退出透明", action: #selector(exitOverlay), keyEquivalent: "")

@@ -23,7 +23,6 @@ struct GameOverlayView: View {
             }.buttonStyle(.plain).opacity(hovering ? 0.9 : 0.42)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
-                    if !state.enabled { Text("陪练已暂停").font(.system(size: 10)) }
                     if let warning = state.error ?? state.connectionError {
                         Text(warning).font(.system(size: 11)).foregroundStyle(Color(red: 1, green: 0.87, blue: 0.53))
                     }
